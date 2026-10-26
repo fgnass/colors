@@ -1,0 +1,43 @@
+{
+ "_comment": "Sampled near-whites and near-blacks: what to use instead of pure white and black. Input of the canvas tints and the no-pure-black/white rule.",
+ "nearWhite": [
+  "#FAFAF2",
+  "#FFFFF5",
+  "#F3F6FD",
+  "#F9FDFE",
+  "#F9FDFE",
+  "#EFEFEF",
+  "#F1F5FD",
+  "#FDFDF5",
+  "#F8FCFD",
+  "#FFFFF5",
+  "#F9FFFF",
+  "#EFEFEF",
+  "#EFEFEF",
+  "#FEFFF1",
+  "#FDFDF5",
+  "#FAF9F5",
+  "#FDF2EC",
+  "#F4F8F9"
+ ],
+ "nearBlack": [
+  "#0A1215",
+  "#011121",
+  "#0B0B0B",
+  "#151515",
+  "#030C1B",
+  "#0F181F",
+  "#0A1114",
+  "#0F171F",
+  "#011122",
+  "#030C1B",
+  "#0C0C0C",
+  "#151515",
+  "#0A0A0C",
+  "#0F171F",
+  "#121619",
+  "#0A1114",
+  "#101820",
+  "#1D1D1D"
+ ]
+}

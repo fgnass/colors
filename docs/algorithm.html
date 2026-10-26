@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How Colors Works</title>
+  <style>
+    :root {
+      --bg: #fbfaf8; --text: #1c1b1a; --muted: #6b6864; --rule: #e6e2dc; --card: #ffffff;
+      --rule-bg: #e8f1fb; --rule-fg: #1d4f86;
+      --exc-bg: #fdecd9; --exc-fg: #8a4500;
+      --data-bg: #e6f3ea; --data-fg: #1f6136;
+      --tune-bg: #f0e8f8; --tune-fg: #5b2d86;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #161514; --text: #ece9e4; --muted: #a39e97; --rule: #2e2c29; --card: #1e1d1b;
+        --rule-bg: #17304b; --rule-fg: #a9cdf5; --exc-bg: #43280f; --exc-fg: #f7c08a;
+        --data-bg: #173323; --data-fg: #9fdcb3; --tune-bg: #2e1f3f; --tune-fg: #d4b5f4;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 "Instrument Sans Variable", system-ui, sans-serif; }
+    main { max-width: 860px; margin: 0 auto; padding: 48px 16px 96px; }
+    h1 { font: 400 44px/1.1 "Piazzolla Variable", Georgia, serif; letter-spacing: -.02em; margin: 0 0 12px; }
+    h2 { font: 400 28px/1.2 "Piazzolla Variable", Georgia, serif; margin: 56px 0 8px; padding-top: 16px; border-top: 1px solid var(--rule); }
+    h3 { font: 600 16px/1.4 inherit; margin: 28px 0 6px; }
+    p, li { max-width: 70ch; }
+    .lead { color: var(--muted); font-size: 18px; }
+    code { font: 13px "JetBrains Mono Variable", ui-monospace, monospace; background: var(--card); border: 1px solid var(--rule); border-radius: 4px; padding: 0 4px; }
+    .legend { display: flex; flex-wrap: wrap; gap: 10px 18px; margin: 24px 0 8px; padding: 14px 16px; background: var(--card); border: 1px solid var(--rule); border-radius: 8px; font-size: 14px; }
+    .tag { display: inline-block; font: 600 10.5px/1 "JetBrains Mono Variable", monospace; letter-spacing: .06em; text-transform: uppercase; padding: 4px 6px; border-radius: 4px; margin-right: 6px; vertical-align: 2px; white-space: nowrap; }
+    .rule { background: var(--rule-bg); color: var(--rule-fg); }
+    .exc { background: var(--exc-bg); color: var(--exc-fg); }
+    .data { background: var(--data-bg); color: var(--data-fg); }
+    .tune { background: var(--tune-bg); color: var(--tune-fg); }
+    ul.items { list-style: none; padding: 0; margin: 8px 0; }
+    ul.items > li { padding: 10px 0; border-bottom: 1px solid var(--rule); }
+    ul.items > li:last-child { border-bottom: 0; }
+    .why { color: var(--muted); font-size: 14px; display: block; margin-top: 2px; }
+    table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 12px 0; }
+    th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+    th { font-weight: 600; color: var(--muted); }
+    nav ol { columns: 2; font-size: 14px; padding-left: 18px; }
+    @media (max-width: 600px) { nav ol { columns: 1; } h1 { font-size: 34px; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>How Colors works</h1>
+  <p class="lead">A palette generator for interfaces. Every palette is drawn from a statistical model of hand-picked editorial palettes; plates, gradients, interfaces, scales and SVGs are derived from it by rules. This page lists those rules, and marks where a rule is a plain consequence of the approach and where a special case steps in.</p>
+
+  <div class="legend">
+    <span><span class="tag rule">Rule</span>follows from the general approach</span>
+    <span><span class="tag data">Data</span>learned from the dataset</span>
+    <span><span class="tag tune">Tuned</span>a constant set by eye against examples</span>
+    <span><span class="tag exc">Exception</span>a special case that overrides the general rule</span>
+  </div>
+
+  <nav><ol>
+    <li><a href="#inputs">Inputs</a></li>
+    <li><a href="#palette">The palette</a></li>
+    <li><a href="#mood">Mood (Muted ↔ Vivid)</a></li>
+    <li><a href="#hues">Hue families</a></li>
+    <li><a href="#canvases">Canvases and neutrals</a></li>
+    <li><a href="#scales">Scales 50–950</a></li>
+    <li><a href="#count">Colors 2 / 3 / 4</a></li>
+    <li><a href="#plates">Plates</a></li>
+    <li><a href="#gradient">Gradient</a></li>
+    <li><a href="#ui">Interface tokens</a></li>
+    <li><a href="#svg">Your SVG</a></li>
+    <li><a href="#summary">Where the exceptions are</a></li>
+  </ol></nav>
+
+  <h2 id="inputs">1 · Inputs</h2>
+  <ul class="items">
+    <li><span class="tag data">Data</span><strong>309 palettes</strong> (<code>data/palettes.json</code>), each with main, its light and dark tint, and two accents. A third of the colors are moved slightly (ΔE ≈ 1) so no palette is a copy; the statistics are unchanged.</li>
+    <li><span class="tag data">Data</span><strong>36 near-whites and near-blacks</strong> (<code>data/neutrals.json</code>): what to use instead of pure white and black.</li>
+    <li><span class="tag data">Data</span><strong>English basic color terms</strong> (Many Languages, Many Colors) name the hue families.</li>
+    <li><span class="tag rule">Rule</span><strong>Color space:</strong> everything is computed in OKLab / OKLCH, inside the sRGB gamut. "Relative chroma" is chroma as a share of the most the gamut allows at that lightness and hue; the <em>cusp</em> is the most colorful color a hue can have at all.</li>
+    <li><span class="tag rule">Rule</span><strong>Seeds:</strong> every palette comes from a seed; separate random streams (palette, mood, gradient) keep one setting from changing the others.</li>
+  </ul>
+
+  <h2 id="palette">2 · The palette</h2>
+  <p>Five roles: <strong>main</strong>, <strong>companion</strong>, <strong>anchor</strong>, and the main's <strong>light</strong> and <strong>dark</strong> tint.</p>
+  <ul class="items">
+    <li><span class="tag data">Data</span><strong>Lightness and relative chroma</strong> of main, companion and anchor come from a Gaussian copula: the measured distribution of each value plus their correlations. Locked colors are fixed and the rest is drawn conditionally.</li>
+    <li><span class="tag data">Data</span><strong>Hues:</strong> the main's hue follows the dataset's hue preference at its lightness (light → yellows, dark → blues and reds); the others follow the measured hue offsets from the main, which are close to random.</li>
+    <li><span class="tag data">Data</span><strong>Tints:</strong> light and dark are the main, moved toward white or black by measured amounts, with slightly less chroma.</li>
+    <li><span class="tag exc">Exception</span><strong>Structural rejections:</strong> palettes with two or more neutrals, or with an anchor that is not the lightness pole, are redrawn with a probability (0.35 / 0.4 acceptance). <span class="why">The copula alone produces them more often than the data.</span></li>
+    <li><span class="tag exc">Exception</span><strong>Cream anchors:</strong> a very light, nearly neutral anchor leans to cream with the measured probability. <span class="why">The data shows it; the copula has no hue.</span></li>
+    <li><span class="tag data">Data</span><strong>Limits:</strong> chroma at most the palettes' 99th percentile (≈ 0.24); no pure black or white — near-neutrals take the lightness range and tint of the sampled near-blacks / near-whites (cool darks, warm lights).</li>
+  </ul>
+
+  <h2 id="mood">3 · Mood (Muted ↔ Vivid)</h2>
+  <p>A shift that stays inside the dataset; 0 is the data. The app no longer has the slider: new palettes are as in the data, and only old links with a mood still use it.</p>
+  <ul class="items">
+    <li><span class="tag rule">Rule</span><strong>Within the distribution:</strong> each color's relative chroma is moved by shifting the normal score it was drawn with. Muted reaches the data's least vivid palettes (not greyer), vivid its most vivid ones.</li>
+    <li><span class="tag rule">Rule</span><strong>Continuous:</strong> the mood is applied to a palette drawn without it, so a change of the mood never draws new colors; canvases and plate shapes stay.</li>
+    <li><span class="tag data">Data</span><strong>At most two vivid colors:</strong> toward vivid only one accent (two with probability 0.4) moves toward its cusp; the others move down a little. The choice is fixed per palette.</li>
+    <li><span class="tag tune">Tuned</span>Shift sizes: muted 1.1 σ, accents 2.5 σ, held back 1 σ.</li>
+    <li><span class="tag exc">Exception</span><strong>Muted widens contrast:</strong> toward muted the lightness range spreads by up to 20 %. <span class="why">The data's least vivid palettes make up with contrast.</span></li>
+    <li><span class="tag exc">Exception</span><strong>Neon above the cap:</strong> at the vivid end the accents may reach chroma 0.32, above the 0.24 limit. <span class="why">Otherwise they never look neon.</span></li>
+  </ul>
+  <h3>Neon Splash</h3>
+  <p>A checkbox: the palette stays as it is, only one color becomes a neon.</p>
+  <ul class="items">
+    <li><span class="tag rule">Rule</span><strong>What neon is:</strong> the color's hue at full strength — the most colorful point that hue has in sRGB (its cusp), e.g. #DEFE00, #FE0072, #C000FE.</li>
+    <li><span class="tag rule">Rule</span><strong>Which color:</strong> the free color that is closest to its own neon (OKLab distance), so the change is the smallest; a chosen hue family first. Locked colors stay.</li>
+    <li><span class="tag data">Data</span><strong>Neon hues:</strong> the hues where the data has neons at least as often as on average (the measured share per 30° bin, interpolated): red-pink through orange, yellow and lime to green (≈ 3°–147°).</li>
+    <li><span class="tag exc">Exception</span><strong>Hot pink from 350°:</strong> the neon hues start at 350° on the pink side. <span class="why">The data's bins are too coarse there; the cusps below 350° are a violet magenta that looked off.</span></li>
+    <li><span class="tag tune">Tuned</span><strong>Hues near them move in:</strong> a hue up to 40° outside moves to the nearest neon hue first, so a magenta becomes a hot pink (#FF03A9) and a teal a neon green. Blues and violets are too far and get no neon; if no color has one (≈ 4 % of palettes), nothing changes.</li>
+    <li><span class="tag tune">Tuned</span><strong>Lightness counts double</strong> in that distance: a pale green that only needs color wins over a mid pink that would also need to get lighter. <span class="why">A change of lightness changes the palette's structure; more color does not.</span></li>
+    <li><span class="tag rule">Rule</span><strong>Same composition:</strong> the fill colors of plate, gradient and interface are chosen without neon, so turning it on only changes colors.</li>
+  </ul>
+
+  <h2 id="hues">4 · Hue families</h2>
+  <ul class="items">
+    <li><span class="tag rule">Rule</span><strong>Families:</strong> every frequent one-word basic color term that is clearly colored (C ≥ 0.1) and at least 20° from a more frequent one: red, orange, yellow, green, teal, blue, purple, pink.</li>
+    <li><span class="tag rule">Rule</span><strong>One hue:</strong> palettes are drawn until one with a clearly colored main, companion or anchor of that family appears (rejection sampling), so any role can carry it.</li>
+    <li><span class="tag rule">Rule</span><strong>Two hues:</strong> every clearly colored color is of one of them, both appear. <strong>The same hue twice:</strong> monochrome. Neutrals are allowed.</li>
+    <li><span class="tag exc">Exception</span><strong>Forced hue:</strong> if 1500 draws find nothing (rare, e.g. with locks), free colors are turned to the family. <span class="why">Then the palette is no longer purely from the model.</span></li>
+  </ul>
+
+  <h2 id="canvases">5 · Canvases and neutrals</h2>
+  <ul class="items">
+    <li><span class="tag data">Data</span><strong>Paper and ink</strong> (light and dark canvas) are drawn from the palettes' near-whites / near-blacks and the sampled ones.</li>
+    <li><span class="tag exc">Exception</span><strong>Tint from the palette:</strong> a cream, cool or warm tint takes the nearest hue of a colored palette color. <span class="why">A cream paper next to purple and red looked khaki.</span></li>
+    <li><span class="tag exc">Exception</span><strong>Lighter paper:</strong> paper lightness is mapped from the measured span (0.9–1) into 0.96–0.99. <span class="why">The measured near-whites are too dark for an app background.</span></li>
+    <li><span class="tag rule">Rule</span><strong>Neutral scale:</strong> from ink to paper, the tint interpolated in OKLab, so a cool ink and a warm paper meet in grey, not olive.</li>
+    <li><span class="tag tune">Tuned</span><strong>Neutral chroma at most 0.015:</strong> the scale keeps only a hint of the canvases' tint. <span class="why">A canvas tinted by the companion made the neutral scale a copy of the companion's scale.</span></li>
+  </ul>
+
+  <h2 id="scales">6 · Scales 50–950</h2>
+  <ul class="items">
+    <li><span class="tag rule">Rule</span><strong>Lightness curve:</strong> fixed per step, closer together at the light end.</li>
+    <li><span class="tag rule">Rule</span><strong>Where a color sits:</strong> at the step of its lightness, but a colorful color needs paler steps above it: at least 1 + 2 × (chroma / cusp chroma) steps. So a vivid lime sits at 300, a trace of cyan at 100. The lightness curve bends around the color.</li>
+    <li><span class="tag exc">Exception</span><strong>Never 50:</strong> a palette color never sits at 50; 50 stays the near-white above it.</li>
+    <li><span class="tag data">Data</span><strong>Chroma profile:</strong> full in the middle, falling off toward white and gently toward black.</li>
+    <li><span class="tag exc">Exception</span><strong>Pale colors:</strong> the profile is not taken literally for very pale colors (floor 0.12). <span class="why">A trace of color says little about how colorful its family may get; without it the scale turned grey.</span></li>
+    <li><span class="tag rule">Rule</span><strong>Hue drift:</strong> a color that darkens turns toward the neighbouring hue whose cusp is darker (yellow → orange → brown, blue → indigo), lighter steps the other way. The amount follows the slope of the cusp lightness over hue.</li>
+    <li><span class="tag tune">Tuned</span><strong>Drift weighting:</strong> the drift is weighted by how high the cusp is (from 0.57, full at 0.74), capped at 90° per unit of lightness. <span class="why">Fitted to the old measured drifts; it keeps purple from turning blue and lets orange darken to red-brown.</span></li>
+    <li><span class="tag exc">Exception</span><strong>Palette pull:</strong> below L 0.6 the steps lean toward the palette's darkest core color (red → plum next to a purple) — only if that color is dark (L &lt; 0.5) and its hue is near (full up to 60°, none from 120°). <span class="why">Across the color circle the mix passes through grey.</span></li>
+  </ul>
+
+  <h2 id="count">7 · Colors 2 / 3 / 4</h2>
+  <p>One setting, one color set, used by every view.</p>
+  <ul class="items">
+    <li><span class="tag rule">Rule</span><strong>The set:</strong> the main plus 1, 2 or 3 fill colors, chosen from the palette as shown (with the mood). Plate, gradient, interface and SVG all use this set.</li>
+    <li><span class="tag rule">Rule</span><strong>Fill order:</strong> the other palette colors first, the more colorful first; the main's own tints only after them. A fill must stand out from the main (lightness contrast ≥ 1.35 or OKLab distance ≥ 0.15) and from the other fills.</li>
+  </ul>
+
+  <h2 id="plates">8 · Plates</h2>
+  <ul class="items">
+    <li><span class="tag rule">Rule</span><strong>Shape:</strong> one tile shape per plate, drawn from the seed; it stays when the mood moves or the color count changes, unless it has too few parts.</li>
+    <li><span class="tag rule">Rule</span><strong>Coloring:</strong> pieces largest first, each takes the least used fill color its neighbours don't have.</li>
+    <li><span class="tag exc">Exception</span><strong>Hand-picked splits:</strong> one-piece shapes are quartered or cut into bands; some shapes are excluded from cutting, rings of circles are rebuilt as overlapping circles. <span class="why">Decided shape by shape.</span></li>
+  </ul>
+
+  <h2 id="gradient">9 · Gradient</h2>
+  <p>One fixed composition: a dark <strong>band</strong> on top with a soft tilted edge, a <strong>glow</strong> above a soft U-shaped edge, a light <strong>field</strong> below. Drawn as two radial CSS gradients.</p>
+  <ul class="items">
+    <li><span class="tag tune">Tuned</span><strong>Composition:</strong> eight constants, measured from reference gradients and then varied by eye (mirrored, lower, flatter U, curved band).</li>
+    <li><span class="tag rule">Rule</span><strong>Glow:</strong> the most colorful color of the set that stands out (C ≥ 0.12, or 0.12 lighter than the darkest colored color).</li>
+    <li><span class="tag rule">Rule</span><strong>Band:</strong> a dark colored color, <strong>field:</strong> the lightest of the rest.</li>
+    <li><span class="tag exc">Exception</span><strong>No near-black band</strong> when a dark color with body (L 0.22–0.6) is there. <span class="why">A deep purple over a lilac glow looks better than black.</span></li>
+    <li><span class="tag exc">Exception</span><strong>Neon field:</strong> a neon that is the lightest color by far becomes the field — but only if another vivid color (C ≥ 0.12) can glow above it and a third colored color can be the band. Else the neon glows. <span class="why">Otherwise a dull dark color would glow, or the neon would be band and field at once.</span></li>
+    <li><span class="tag rule">Rule</span><strong>2 colors:</strong> the more colorful one glows; the other is band or field; the missing stop is a deep or pale step of the glow's scale. <strong>3:</strong> exactly the three. <strong>4:</strong> the color left over turns the field into a second field toward the right.</li>
+  </ul>
+
+  <h2 id="ui">10 · Interface tokens</h2>
+  <h3>Light and dark background</h3>
+  <ul class="items">
+    <li><span class="tag rule">Rule</span><strong>Light:</strong> <code>neutral-100</code> with white cards.</li>
+    <li><span class="tag exc">Exception</span><strong>A light near-neutral palette color</strong> (C &lt; 0.03, L 0.84–0.98) becomes the background instead, at most L 0.955, with cards near white in its hue. <span class="why">A light neon shows on grey, not on white (Lime on Spare White).</span></li>
+    <li><span class="tag rule">Rule</span><strong>Dark:</strong> a deep version (L 0.2) of the darkest colored color the interface uses; without one, <code>neutral-950</code>. Cards a little lighter.</li>
+    <li><span class="tag exc">Exception</span><strong>Main wins ties:</strong> a color within 0.1 lightness of the main counts as a tie, and the main gives the dark background.</li>
+  </ul>
+  <h3>Greys</h3>
+  <ul class="items">
+    <li><span class="tag rule">Rule</span><strong>All greys come from the neutral scale:</strong> text <code>950</code> / <code>50</code>, muted text <code>700</code> / <code>400</code> (at least 4.5:1), light borders <code>200</code>. Light text on colors is <code>neutral-50</code>. The canvases themselves stay paper and ink: the SVG backgrounds and <code>brand-paper</code> / <code>brand-ink</code>.</li>
+  </ul>
+  <h3>Colors</h3>
+  <ul class="items">
+    <li><span class="tag rule">Rule</span><strong>The loud color</strong> is the most colorful color of the set. It appears only in small fills: main action, logo, badge, today's bar, toggle track — always as itself, never darkened.</li>
+    <li><span class="tag rule">Rule</span><strong>Background counts as a color:</strong> with 2, the interface is the loud color on neutrals; with 3 and 4, one or two more colors become the chart's data series. Tags, avatar and the secondary button stay neutral.</li>
+    <li><span class="tag rule">Rule</span><strong>Data series without a second color:</strong> the loud color's own tint (two steps away on its scale).</li>
+    <li><span class="tag exc">Exception</span><strong>Text on the loud color by APCA:</strong> light or a dark shade of the second color's hue, whichever reads better by APCA. <span class="why">WCAG 2 favors dark text on mid reds, though light reads far better.</span></li>
+    <li><span class="tag exc">Exception</span><strong>Nav pill:</strong> the main's own light tint when the loud color is the main (as in the gradient), else step 100 of the loud color; the same in both modes.</li>
+    <li><span class="tag rule">Rule</span><strong>Contrast:</strong> other colored tokens take the nearest step of their scale with 3:1 against the surface.</li>
+  </ul>
+
+  <h2 id="svg">11 · Your SVG</h2>
+  <ul class="items">
+    <li><span class="tag rule">Rule</span><strong>Colors found</strong> after CSS and inheritance (fills, strokes, gradient stops; masks and clip paths left alone), ranked by area.</li>
+    <li><span class="tag rule">Rule</span><strong>Mapping:</strong> the largest color takes the main, the others the set's fill colors; larger shapes get the fill with more lightness contrast, small ones may take a vivid color with little contrast (the dot).</li>
+    <li><span class="tag rule">Rule</span>Manual choices per color override the automatic one.</li>
+  </ul>
+
+  <h2 id="summary">12 · Where the exceptions are</h2>
+  <table>
+    <tr><th>Area</th><th>Exception</th><th>Why</th></tr>
+    <tr><td>Palette</td><td>Rejection of two neutrals / non-pole anchor; cream anchors</td><td>Copula misses these patterns</td></tr>
+    <tr><td>Mood</td><td>Contrast widening when muted; neon above the chroma cap</td><td>Match the data's extremes</td></tr>
+    <tr><td>Hue families</td><td>Forced hue after 1500 draws</td><td>Rare combinations</td></tr>
+    <tr><td>Canvases</td><td>Tint snapped to palette hues; paper lifted to 0.96–0.99</td><td>Khaki paper; too dark backgrounds</td></tr>
+    <tr><td>Scales</td><td>Never at 50; pale-color floor; palette pull only between near hues</td><td>Grey scales; muddy darks</td></tr>
+    <tr><td>Plates</td><td>Hand-picked splits and exclusions</td><td>Shape by shape</td></tr>
+    <tr><td>Gradient</td><td>No near-black band; neon field</td><td>Specific palettes looked wrong</td></tr>
+    <tr><td>Interface</td><td>Grey palette color as background; main wins dark ties; APCA text; nav pill tint</td><td>Lime and Red Salsa cases</td></tr>
+  </table>
+  <p>Most exceptions are guards against one failure each, found on a specific palette. Each is a single condition in the code and named in a comment there.</p>
+</main>
+<script type="module">
+  import "@fontsource-variable/piazzolla/opsz.css";
+  import "@fontsource-variable/instrument-sans/index.css";
+  import "@fontsource-variable/jetbrains-mono/index.css";
+</script>
+</body>
+</html>
