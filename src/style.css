@@ -323,7 +323,7 @@ body.grid main { overflow: auto; -webkit-overflow-scrolling: touch; }
 .w-tag.second { background: var(--t-second); color: var(--t-on-second); }
 .w-split { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 12px; flex: 1; min-height: 0; }
 .w-title { display: flex; justify-content: space-between; align-items: baseline; font-weight: 600; }
-.w-link { font-size: 12px; font-weight: 500; color: var(--t-primary); }
+.w-link { font-size: 12px; font-weight: 500; text-decoration: underline 2px var(--t-primary); text-underline-offset: 3px; }
 .w-table table { width: 100%; border-collapse: collapse; }
 .w-table td { padding: 8px 6px; border-top: 1px solid var(--t-border); white-space: nowrap; }
 .w-table td:first-child { padding-left: 0; overflow: hidden; text-overflow: ellipsis; max-width: 0; width: 34%; }
@@ -354,6 +354,12 @@ body.grid main { overflow: auto; -webkit-overflow-scrolling: touch; }
 .m-bars i { flex: 1; border-radius: calc(1.8 * var(--u)); background: var(--t-bg); }
 .m-bars i.past { background: var(--t-accent); }
 .m-bars i.past.alt { background: var(--t-accent2); }
+.m-legend { display: flex; gap: calc(4 * var(--u)); margin-top: calc(2.4 * var(--u)); font-size: calc(3.8 * var(--u)); color: var(--t-muted); }
+.m-legend span, .w-legend span { display: flex; align-items: center; gap: calc(1.4 * var(--u)); }
+.m-legend i { width: calc(2.6 * var(--u)); height: calc(2.6 * var(--u)); border-radius: 50%; }
+.w-legend { display: flex; gap: 12px; font-size: 11px; color: var(--t-muted); }
+.w-ui .w-legend span { gap: 5px; }
+.w-legend i { width: 8px; height: 8px; border-radius: 50%; }
 .m-bars i.on { background: var(--t-primary); }
 .m-pair { display: flex; gap: calc(2.5 * var(--u)); }
 .m-chip { display: flex; gap: calc(2.4 * var(--u)); align-items: baseline; padding: calc(2.6 * var(--u)) calc(4 * var(--u)); border-radius: 99px; background: var(--t-surface); }
@@ -411,8 +417,9 @@ body.settings-open .settings { transform: none; }
 .switch { width: 50px; height: 30px; border-radius: 999px; background: #d9d9de; position: relative; flex: none; transition: background .2s; }
 .switch::after { content: ""; position: absolute; left: 3px; top: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: left .2s var(--ease); }
 input:checked + .switch { background: var(--ink); }
-/* the neon splash switch shows the palette's neon when on */
-#neon:checked + .switch { background: var(--neon, var(--ink)); }
+/* a splash of the palette's neon by the label; the switch itself as the others */
+.neon-field .label { display: flex; align-items: center; gap: 5px; }
+.neon-splash { width: 18px; height: 18px; flex: none; margin: -4px 0; fill: var(--neon, var(--ink)); stroke: rgba(0, 0, 0, .15); stroke-width: .6; }
 input:checked + .switch::after { left: 23px; }
 @media (min-width: 980px) {
   .scrim { background: transparent; }

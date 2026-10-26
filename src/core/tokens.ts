@@ -108,7 +108,7 @@ function lightBg(p: Palette, sc: Scales): { bg: Lch; surface: Lch } {
  * fewer: 2, the loud color and neutrals; 3, plus a data series; 4, plus a second series.
  * Tags, avatar and the secondary button stay neutral.
  */
-export function themes(p: Palette, cv: Canvases, sc: Scales, roles: Role[] = [...CORE]): { light: Theme; dark: Theme } {
+export function themes(p: Palette, cv: Canvases, sc: Scales, roles: Role[] = [...CORE], accessible = false): { light: Theme; dark: Theme } {
   // the palette colors in use, as on the plate; tints of the main count as the main
   const set = [...new Set(roles.map((r) => (r === "light" || r === "dark" ? "main" : r)))] as (typeof CORE)[number][];
   const count = roles.length;
@@ -121,7 +121,9 @@ export function themes(p: Palette, cv: Canvases, sc: Scales, roles: Role[] = [..
   const [vivid, next = vivid] = byC;
   // the neutral background counts as one of the colors: the interface uses one palette color fewer,
   // the loud one for actions and the rest as data series (2: loud + neutral, 3: one series, 4: two)
-  const series = byC.slice(1, Math.max(1, count - 1)).filter((r) => p[r].c >= 0.04);
+  // the first series needs color (else the series is neutral); a second one may be grey, next to a colored first
+  const candidates = byC.slice(1, Math.max(1, count - 1));
+  const series = candidates[0] && p[candidates[0]].c >= 0.04 ? candidates : [];
   const loud = p[vivid];
   const primary = toHex(loud);
   const onPrimary = onLoud(primary, p[next], paper);
@@ -162,5 +164,59 @@ export function themes(p: Palette, cv: Canvases, sc: Scales, roles: Role[] = [..
     highlight: darkHighlight, onHighlight: onColor(darkHighlight, paper, ink),
     ...tertiary(toHex(darkBg), paper),
   };
-  return { light, dark };
+  if (!accessible) return { light, dark };
+  const scale = sc[vivid];
+  return { light: passAA(light, scale, loud, [paper, ink], sc.neutral, [800, 900, 950]), dark: passAA(dark, scale, loud, [paper, ink], sc.neutral, [300, 200, 100, 50]) };
 }
+
+/** the better of the text colors on a background by WCAG 2 */
+const bestText = (bg: string, texts: string[]) => texts.reduce((a, b) => (contrast(b, bg) > contrast(a, bg) ? b : a));
+
+/** the color moved in lightness, in small steps, until the text reaches 4.5:1 on it */
+function readableUnder(bg: string, text: string): string {
+  const c = fromHex(bg);
+  const dir = fromHex(text).l > c.l ? -1 : 1;
+  for (let l = c.l; l >= 0 && l <= 1; l += dir * 0.01) {
+    const hex = toHex(toGamut({ ...c, l }));
+    if (contrast(text, hex) >= 4.5) return hex;
+  }
+  return bg;
+}
+
+/**
+ * The theme made to pass WCAG AA: the loud color moves along its own scale,
+ * from its own step, as far as needed for 3:1 against background and cards
+ * and 4.5:1 for text on it; text on colors is the more readable of paper and
+ * ink where it doesn't reach 4.5:1; muted text moves toward the text color.
+ */
+function passAA(t: Theme, scale: Ramp, loud: Lch, texts: string[], neutral: Ramp, mutedSteps: Step[]): Theme {
+  const out = { ...t };
+  const fits = (c: string) => contrast(c, t.bg) >= 3 && contrast(c, t.surface) >= 3;
+  if (!fits(t.primary) || contrast(t.onPrimary, t.primary) < 4.5) {
+    const own = [...STEPS].sort((a, b) => Math.abs(scale[a].l - loud.l) - Math.abs(scale[b].l - loud.l));
+    const step = own.find((s) => { const c = toHex(scale[s]); return fits(c) && contrast(bestText(c, texts), c) >= 4.5; });
+    if (step) out.primary = toHex(scale[step]);
+  }
+  const pairs = [["primary", "onPrimary"], ["primarySoft", "onPrimarySoft"], ["accent", "onAccent"], ["second", "onSecond"], ["highlight", "onHighlight"], ["tertiary", "onTertiary"]] as const;
+  for (const [bg, on] of pairs) {
+    if (contrast(out[on], out[bg]) >= 4.5) continue;
+    out[on] = bestText(out[bg], [out[on], ...texts]);
+    // a mid tone that no text reads on: a little darker under light text, lighter under dark text
+    if (contrast(out[on], out[bg]) < 4.5) out[bg] = readableUnder(out[bg], out[on]);
+  }
+  const reads = (c: string) => contrast(c, t.bg) >= 4.5 && contrast(c, t.surface) >= 4.5;
+  if (!reads(t.muted)) out.muted = mutedSteps.map((s) => toHex(neutral[s])).find(reads) ?? t.text;
+  return out;
+}
+
+/** WCAG AA for the interface, light and dark, as a share of the requirement (1 = passes): text 4.5:1, the loud color against background and cards 3:1 */
+export function accessibility(t: { light: Theme; dark: Theme }): number {
+  return Math.min(...[t.light, t.dark].flatMap((m) => [
+    contrast(m.primary, m.bg) / 3,
+    contrast(m.primary, m.surface) / 3,
+    ...([["text", "bg"], ["text", "surface"], ["muted", "bg"], ["muted", "surface"], ["onPrimary", "primary"], ["onPrimarySoft", "primarySoft"],
+      ["onAccent", "accent"], ["onSecond", "second"], ["onHighlight", "highlight"], ["onTertiary", "tertiary"]] as const)
+      .map(([a, b]) => contrast(m[a], m[b]) / 4.5),
+  ]));
+}
+

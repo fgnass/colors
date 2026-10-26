@@ -32,6 +32,8 @@ interface Entry {
   /** neon splash: the color closest to a neon made neon */
   neon: boolean;
   colors: ArtColors;
+  /** interface tokens made to pass WCAG AA */
+  accessible: boolean;
   palette: Palette;
   canvas: Canvases;
   gradient: Gradient;
@@ -47,7 +49,7 @@ interface Entry {
 type Setting = { mood?: number; families: string[]; neon: boolean };
 
 function create(seed: number, locks: AllLocks = {}, { mood = 0, families, neon }: Setting = state): Entry {
-  const colors = state.colors;
+  const { colors, accessible } = state;
   const rng = createRng(seed);
   const { paper, ink, ...colorLocks } = locks;
   // the mood has its own stream, so the setting doesn't move other colors
@@ -64,7 +66,7 @@ function create(seed: number, locks: AllLocks = {}, { mood = 0, families, neon }
   const gradient = gradientFrom(palette, roles);
   const sc = scales(palette, canvas);
   const names = uniqueNames([...ROLE_ORDER.map((r) => [r, palette[r]] as [Role, Lch]), ["paper", canvas.paper], ["ink", canvas.ink]]);
-  return { seed, locks, mood, families, neon, colors, palette, canvas, gradient, art, names, name: paletteName(names.main, names.companion), scales: sc, themes: themes(palette, canvas, sc, roles) };
+  return { seed, locks, mood, families, neon, colors, accessible, palette, canvas, gradient, art, names, name: paletteName(names.main, names.companion), scales: sc, themes: themes(palette, canvas, sc, roles, accessible) };
 }
 
 const LOCKABLE: (Lockable | CanvasKind)[] = ["main", "companion", "anchor", "paper", "ink"];
@@ -93,6 +95,7 @@ const state = {
   families: [] as string[],
   neon: true,
   colors: 3 as ArtColors,
+  accessible: false,
   /** palettes kept on the shortlist, by key */
   shortlist: [] as Entry[],
   /** a pasted SVG, shown in the palette's colors */
@@ -108,10 +111,10 @@ const current = () => upToDate(state.index);
 /** the palette at i in the feed, remade when the number of colors changed since it was made */
 function upToDate(i: number): Entry {
   const e = state.history[i];
-  return e.colors === state.colors ? e : (state.history[i] = create(e.seed, e.locks, e));
+  return e.colors === state.colors && e.accessible === state.accessible ? e : (state.history[i] = create(e.seed, e.locks, e));
 }
 
-function parseKey(hash: string): { seed: number; locks: AllLocks; mood: number; families: string[]; neon: boolean; colors?: ArtColors } | null {
+function parseKey(hash: string): { seed: number; locks: AllLocks; mood: number; families: string[]; neon: boolean; colors?: ArtColors; accessible: boolean } | null {
   const m = hash.match(/^#([0-9a-z]+)(?:~([^;]*))?((?:;[a-z]-?\d+)*)$/i);
   if (!m) return null;
   const opt = Object.fromEntries([...(m[3] ?? "").matchAll(/;([a-z])(-?\d+)/gi)].map((x) => [x[1], Number(x[2])]));
@@ -124,7 +127,7 @@ function parseKey(hash: string): { seed: number; locks: AllLocks; mood: number; 
   const colors = [2, 3, 4].includes(opt.c) ? (opt.c as ArtColors) : undefined;
   const mood = Number.isFinite(opt.m) ? Math.max(-1, Math.min(1, opt.m / 100)) : 0;
   const families = [opt.f, opt.g].map((i) => HUE_FAMILIES[i]?.name).filter((f): f is string => !!f);
-  return { seed: parseInt(m[1], 36), locks, mood, families, neon: opt.n === 1, colors };
+  return { seed: parseInt(m[1], 36), locks, mood, families, neon: opt.n === 1, colors, accessible: opt.a === 1 };
 }
 
 const readHash = () => parseKey(location.hash);
@@ -139,7 +142,7 @@ function keyOf(e: Entry): string {
 
 /** the colors in the path (for link previews), what makes the palette in the hash */
 function writeHash(e: Entry) {
-  history.replaceState(null, "", `/p/${shareToken(e)}${keyOf(e)}${e.colors === 2 ? "" : `;c${e.colors}`}`);
+  history.replaceState(null, "", `/p/${shareToken(e)}${keyOf(e)}${e.colors === 2 ? "" : `;c${e.colors}`}${e.accessible ? ";a1" : ""}`);
 }
 
 // ---------- shortlist ----------
@@ -326,6 +329,10 @@ const D_ICONS = {
 };
 const dIcon = (k: keyof typeof D_ICONS) => `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${D_ICONS[k]}</svg>`;
 
+/** with two data series (four colors), a legend for the bars */
+const seriesLegend = (t: Theme, cls: string) => t.accent2 === t.accent ? "" :
+  `<div class="${cls}"><span><i style="background:var(--t-accent)"></i>Design</span><span><i style="background:var(--t-accent2)"></i>Research</span></div>`;
+
 // Interface preview: the loud color only in small fills (main action, logo,
 // badge, today's bar, toggle), its own tint as the second series, the next
 // color darkened for tags with white text; cards on a calm background.
@@ -335,7 +342,7 @@ function mobileUi(t: Theme, e: Entry): string {
     <div class="m-top"><div class="m-logo">${esc(e.name[0])}</div><b>${esc(e.name.split(" & ")[0])}</b><div class="m-avatar"></div></div>
     <div class="m-card"><div class="m-label">Weekly activity</div>
       <div class="m-row"><span class="m-big">2,481</span><span class="m-badge">+12.4%</span></div>
-      <div class="m-bars">${activityBars(e)}</div></div>
+      <div class="m-bars">${activityBars(e)}</div>${seriesLegend(t, "m-legend")}</div>
     <div class="m-pair"><span class="m-chip second">Design<b>12</b></span><span class="m-chip">Research<b>7</b></span></div>
     <ul class="m-list"><li>Notifications<span class="m-toggle"></span></li></ul>
     <div class="m-more m-projects"><div class="m-label">Projects</div><ul class="m-list">${(["companion", "anchor", "dark"] as Role[]).map((r, i) => `<li><b>${esc(e.names[r])}</b><span class="m-tag${i % 2 ? "" : " second"}">${["Design", "Research", "Launch"][i]}</span></li>`).join("")}</ul></div>
@@ -368,7 +375,7 @@ function desktopUi(t: Theme, e: Entry): string {
     <div class="w-main">
       <div class="w-head"><b class="w-h">Overview</b><span class="w-search">Search…</span><span class="w-btn p">Create</span><span class="w-avatar"></span></div>
       <div class="w-stats">
-        <div class="w-card"><div class="w-label">Weekly activity</div><div class="w-row"><span class="w-big">2,481</span><span class="w-badge">+12.4%</span></div><div class="m-bars w-bars">${activityBars(e)}</div></div>
+        <div class="w-card"><div class="w-label">Weekly activity</div><div class="w-row"><span class="w-big">2,481</span><span class="w-badge">+12.4%</span></div><div class="m-bars w-bars">${activityBars(e)}</div>${seriesLegend(t, "w-legend")}</div>
         <div class="w-card"><div class="w-label">Open tasks</div><div class="w-row"><span class="w-big">38</span><span class="w-muted">6 due today</span></div><span class="w-progress"><i style="width:64%"></i></span><div class="w-muted">64% of the sprint done</div></div>
         <div class="w-card"><div class="w-label">Team</div><div class="w-row"><span class="w-big">12</span><span class="w-muted">members</span></div><div class="w-pair"><span class="w-tag second">Design 5</span><span class="w-tag">Research 7</span></div></div>
       </div>
@@ -762,6 +769,7 @@ function render() {
   // the single palette shows its own settings; new ones are made with them
   if (state.view === "feed") { state.families = e.families; state.neon = e.neon; }
   document.querySelector<HTMLInputElement>("#neon")!.checked = state.neon;
+  document.querySelector<HTMLInputElement>("#accessible")!.checked = state.accessible;
   document.querySelectorAll<HTMLElement>("[data-family]").forEach((b) => {
     const n = state.families.filter((f) => f === b.dataset.family).length;
     b.classList.toggle("on", b.dataset.family ? n > 0 : !state.families.length);
@@ -793,6 +801,17 @@ function setFamilies(families: string[]) {
 function setNeon(neon: boolean) {
   state.neon = neon;
   remake(state.view === "grid" ? pageIndices() : [state.index], { neon });
+  render();
+}
+
+const ACCESSIBLE_KEY = "colors.accessible";
+
+/** Same palettes, interface tokens made to pass WCAG AA or as they are (the feed's palettes are remade as they come up). */
+function setAccessible(on: boolean, store = true) {
+  state.accessible = on;
+  state.next = null;
+  state.shortlist = state.shortlist.map((w) => create(w.seed, w.locks, w));
+  if (store) try { localStorage.setItem(ACCESSIBLE_KEY, on ? "1" : ""); } catch { /* not stored */ }
   render();
 }
 
@@ -839,8 +858,12 @@ function mount() {
         <div class="seg" role="group" aria-label="Colors in the artwork">${[2, 3, 4].map((n) => `<button data-colors="${n}">${n}</button>`).join("")}</div>
       </div>
       <label class="field row neon-field">
-        <div><div class="label">Neon splash</div><div class="hint">The palette as it is, the color closest to a neon made neon</div></div>
+        <div><div class="label">Neon splash <svg class="neon-splash" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4.6c1.5-.4 2 1.6 3.3 2.2 1.4.6 3.4-.4 4 1 .6 1.5-1.3 2.4-1.2 3.9.1 1.4 2.2 2.4 1.5 3.8-.7 1.4-2.8.6-4 1.5-1.2.9-1.2 3.1-2.8 3.2-1.5.1-1.8-2-3-2.9-1.2-.9-3.4-.5-3.9-2-.5-1.4 1.5-2.3 1.5-3.7 0-1.5-1.9-2.6-1.2-3.9.7-1.4 2.8-.4 4-1.2.8-.6 1-1.7 1.8-1.9Z"/><circle cx="20.2" cy="4.6" r="1.5"/><circle cx="3.6" cy="4.2" r="1.1"/><circle cx="21" cy="19.6" r="1.1"/><circle cx="4.4" cy="20.6" r="1.4"/></svg></div><div class="hint">The palette as it is, the color closest to a neon made neon</div></div>
         <input id="neon" type="checkbox"><span class="switch"></span>
+      </label>
+      <label class="field row accessible-field">
+        <div><div class="label">Accessible tokens</div><div class="hint">Interface colors pass WCAG AA in light and dark mode; the palette stays as it is</div></div>
+        <input id="accessible" type="checkbox"><span class="switch"></span>
       </label>
     </section>
     <div class="toast"></div>
@@ -866,6 +889,7 @@ function mount() {
   document.querySelectorAll<HTMLElement>("[data-family]").forEach((b) =>
     b.addEventListener("click", () => pickFamily(b.dataset.family || undefined)));
   document.querySelector<HTMLInputElement>("#neon")!.addEventListener("change", (ev) => setNeon((ev.target as HTMLInputElement).checked));
+  document.querySelector<HTMLInputElement>("#accessible")!.addEventListener("change", (ev) => setAccessible((ev.target as HTMLInputElement).checked));
   swipe();
 }
 
@@ -1117,6 +1141,7 @@ window.addEventListener("hashchange", () => {
   state.families = h.families;
   state.neon = h.neon;
   state.colors = h.colors ?? 2;
+  if (h.accessible) state.accessible = true;
   push(create(h.seed, h.locks, { ...state, mood: h.mood }));
 });
 
@@ -1138,6 +1163,7 @@ state.families = fromUrl?.families ?? [];
 // without a link: the neon splash on, three colors in the artwork
 state.neon = fromUrl?.neon ?? true;
 state.colors = fromUrl?.colors ?? 3;
+try { state.accessible = fromUrl?.accessible || !!localStorage.getItem(ACCESSIBLE_KEY); } catch { state.accessible = !!fromUrl?.accessible; }
 wasWide = wide();
 mount();
 try {
