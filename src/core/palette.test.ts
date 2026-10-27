@@ -5,7 +5,7 @@ import { generatePalette, generatePalettes, HUE_FAMILIES, isNeon, type Palette }
 import { nearestFamily } from "./families.ts";
 import { createRng } from "./random.ts";
 import { inGamut } from "./color.ts";
-import params from "./params.json" with { type: "json" };
+import params from "./params.ts";
 
 const N = 4000;
 const rng = createRng(1234);

@@ -10,7 +10,7 @@
     "pages": "vite build && wrangler pages dev --port 8796",
     "deploy": "npm run build && wrangler pages deploy",
     "test": "node --test 'src/**/*.test.ts'",
-    "fit": "uv run -q --no-project --with numpy python -I scripts/fit.py data src/core/params.json",
+    "fit": "uv run -q --no-project --with numpy python -I scripts/fit.py data src/core/params.ts",
     "shapes": "node scripts/shapes.mjs data/shapes src/shapes.ts",
     "names": "node scripts/names.mjs data/names public/colornames.txt"
   },

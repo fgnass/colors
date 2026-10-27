@@ -4,36 +4,23 @@ import "@fontsource-variable/instrument-sans/index.css";
 import "@fontsource-variable/jetbrains-mono/index.css";
 import "./style.css";
 
-import { sampleCanvases, type CanvasKind, type Canvases } from "./core/canvas.ts";
+import type { CanvasKind, Canvases } from "./core/canvas.ts";
 import { contrast, cssOklch, fromHex, toGamut, toHex, type Lch } from "./core/color.ts";
-import { artSvg, composeArt, fillRoles, type Art, type ArtColors } from "./art.ts";
+import { artSvg, fillRoles, type Art, type ArtColors } from "./art.ts";
 import { toCss, toJson, toTailwind } from "./core/export.ts";
 import { gradientCss, gradientFrom, type Gradient } from "./core/gradient.ts";
 import { colorName, loadNames, paletteName, uniqueNames } from "./core/names.ts";
-import { generatePalettes, HUE_FAMILIES, isNeon, ROLES, type Lockable, type Locks, type Palette, type Role } from "./core/palette.ts";
+import { HUE_FAMILIES, isNeon, ROLES, type Lockable, type Palette, type Role } from "./core/palette.ts";
 import { nearestStep, STEPS } from "./core/ramp.ts";
 import { createRng, randomSeed } from "./core/random.ts";
 import { scales, themes, type Scales, type Theme } from "./core/tokens.ts";
-import { parseShare, shareToken, tokenOf } from "./share.ts";
+import { keyOfPath, linkKey, make, parseLink, type AllLocks, type Key } from "./link.ts";
 import { analyzeSvg, recolorSvg, svgUri, type SvgArt } from "./svg.ts";
 import { endTour, startTour, tourActive, type TourHost } from "./tour.ts";
 
 // ---------- model ----------
 
-type AllLocks = Locks & Partial<Canvases>;
-
-interface Entry {
-  seed: number;
-  locks: AllLocks;
-  /** mood setting used, -1 muted … 0 as in the data … 1 vivid (no longer set in the app, kept for old links) */
-  mood: number;
-  /** hue families the palette contains (the same twice: monochrome), empty = any */
-  families: string[];
-  /** neon splash: the color closest to a neon made neon */
-  neon: boolean;
-  colors: ArtColors;
-  /** interface tokens made to pass WCAG AA */
-  accessible: boolean;
+interface Entry extends Key {
   palette: Palette;
   canvas: Canvases;
   gradient: Gradient;
@@ -50,17 +37,7 @@ type Setting = { mood?: number; families: string[]; neon: boolean };
 
 function create(seed: number, locks: AllLocks = {}, { mood = 0, families, neon }: Setting = state): Entry {
   const { colors, accessible } = state;
-  const rng = createRng(seed);
-  const { paper, ink, ...colorLocks } = locks;
-  // the mood has its own stream, so the setting doesn't move other colors
-  const { palette, base, plain } = generatePalettes(rng, colorLocks, { mood, families, neon, moodRng: createRng(seed ^ 0x6d6f6f64) });
-
-  rng(); // formerly the plate variant; still drawn so existing seeds keep their canvases
-  // sampled last so canvases don't change the palettes of existing seeds
-  // canvases and artwork from the palette without the mood, so moving it only changes colors
-  const canvas = sampleCanvases(rng, base, { paper, ink });
-  // fill colors chosen without neon, so turning it on keeps the composition and only changes colors
-  const art = composeArt(rng, base, colors, plain);
+  const { palette, plain, canvas, art } = make({ seed, locks, mood, families, neon, colors });
   // the palette colors in use, the same everywhere: the plate's (main + its fill colors)
   const roles: Role[] = ["main", ...fillRoles(plain, colors - 1)];
   const gradient = gradientFrom(palette, roles);
@@ -142,9 +119,9 @@ function keyOf(e: Entry): string {
   return `#${e.seed.toString(36)}${locks ? "~" + locks : ""}${mood}${fams}${e.neon ? ";n1" : ""}`;
 }
 
-/** the colors in the path (for link previews), what makes the palette in the hash */
-function writeHash(e: Entry) {
-  history.replaceState(null, "", `/p/${shareToken(e)}${keyOf(e)}${e.colors === 2 ? "" : `;c${e.colors}`}${e.accessible ? ";a1" : ""}`);
+/** the link to the palette shown */
+function writeLink(e: Entry) {
+  history.replaceState(null, "", `/p/${linkKey(e)}`);
 }
 
 // ---------- shortlist ----------
@@ -776,7 +753,7 @@ function render() {
   document.body.classList.toggle("grid", state.view === "grid");
   document.body.classList.toggle("settings-open", state.settings);
   if (state.view === "feed") {
-    writeHash(e);
+    writeLink(e);
     document.title = `${e.name} — Colors`;
   }
   document.querySelector("main")!.innerHTML = state.view === "grid" ? gridView() : feed();
@@ -1165,31 +1142,8 @@ window.addEventListener("resize", () => {
   if (wasWide !== wide()) { wasWide = wide(); render(); }
 });
 
-window.addEventListener("hashchange", () => {
-  const h = readHash();
-  if (!h || h.seed === current()?.seed) return;
-  // settings come from the URL, like on load
-  state.families = h.families;
-  state.neon = h.neon;
-  state.colors = h.colors ?? 2;
-  if (h.accessible) state.accessible = true;
-  walkTo(null, create(h.seed, h.locks, { ...state, mood: h.mood }));
-});
-
-const fromUrl = readHash();
-
-/** the linked palette; if the model makes other colors from its key now, the link's colors are locked */
-function fromLink(): Entry | null {
-  if (!fromUrl) return null;
-  const e = create(fromUrl.seed, fromUrl.locks, { ...state, mood: fromUrl.mood });
-  const shared = parseShare(tokenOf(location.pathname) ?? "");
-  if (!shared) return e;
-  const linked = { ...shared.palette, ...shared.canvas };
-  const kept = LOCKABLE.every((k) => hex(linked[k]) === hex(k === "paper" || k === "ink" ? e.canvas[k] : e.palette[k]));
-  if (kept) return e;
-  const locks = Object.fromEntries(LOCKABLE.map((k) => [k, linked[k]])) as AllLocks;
-  return create(fromUrl.seed, locks, { ...state, mood: fromUrl.mood });
-}
+// a link: /p/<key>, or an older one with the key in the hash
+const fromUrl = parseLink(keyOfPath(location.pathname) ?? "") ?? readHash();
 state.families = fromUrl?.families ?? [];
 // without a link: the neon splash on, three colors in the artwork
 state.neon = fromUrl?.neon ?? true;
@@ -1207,6 +1161,6 @@ try {
 } catch { /* no storage */ }
 await loadNames("/colornames.txt");
 loadShortlist();
-push(fromLink() ?? create(fromUrl?.seed ?? randomSeed(), fromUrl?.locks ?? {}, { ...state, mood: fromUrl?.mood }));
+push(create(fromUrl?.seed ?? randomSeed(), fromUrl?.locks ?? {}, { ...state, mood: fromUrl?.mood }));
 // the first visit (not via a link to a palette) starts with the tour
 try { if (!fromUrl && !localStorage.getItem(SEEN_KEY)) tour(); } catch { /* no storage */ }

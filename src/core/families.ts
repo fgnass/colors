@@ -1,7 +1,7 @@
 // Hue families (named by the basic color terms), the hue drift (by rule) and
 // the near-white / near-black rule.
 import { hueDiff, maxChroma, wrapHue } from "./color.ts";
-import params from "./params.json" with { type: "json" };
+import params from "./params.ts";
 
 export interface Family {
   name: string;

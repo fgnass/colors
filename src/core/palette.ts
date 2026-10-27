@@ -8,10 +8,10 @@ import { cusp, distance, hueDiff, maxChroma, snap, toGamut, wrapHue, type Lch } 
 import { normCdf, quantileAt, sampleScores, type Copula } from "./copula.ts";
 import { driftAt, families, nearestFamily, neutrals } from "./families.ts";
 import { chance, sampleQuantiles, sampleWeighted, type Rng } from "./random.ts";
-import params from "./params.json" with { type: "json" };
-import { ROLES, type Role } from "./roles.ts";
+import params from "./params.ts";
 
-export { ROLES, type Role };
+export const ROLES = ["main", "companion", "anchor", "light", "dark"] as const;
+export type Role = (typeof ROLES)[number];
 export type Palette = Record<Role, Lch>;
 export type Lockable = "main" | "companion" | "anchor";
 export type Locks = Partial<Record<Lockable, Lch>>;

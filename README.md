@@ -8,7 +8,7 @@ color combinations), plus a small sample of near-whites and near-blacks (36).
 The hue families come from the English basic color terms; scale drift and
 gradients are rules and constants.
 No color is hard-coded: the model holds only distributions
-(`src/core/params.json`). The dataset in
+(`src/core/params.ts`). The dataset in
 `data/` is a perturbed copy of the measurements: about a third of the colors
 are moved a little (lightness, hue, relative chroma; ΔE ≈ 1), at least one in
 every palette, so no palette is an original, while the statistics the model
@@ -18,18 +18,21 @@ is fitted to stay the same.
 npm install
 npm run dev     # the app
 npm test        # fidelity test: generated vs. dataset statistics
-npm run fit     # refit src/core/params.json from data/ (needs uv)
+npm run fit     # refit src/core/params.ts from data/ (needs uv)
 npm run shapes  # split data/shapes/*.svg into fillable pieces -> src/shapes.ts
 npm run names   # filter the color name lists in data/names -> public/colornames.txt
 ```
 
 ## Links and previews
 
-A link to a palette is `/p/<colors>#<key>`. The key remakes the palette in the
-app; the path holds its colors and artwork as shown (`src/share.ts`). If the
-model makes other colors from a key, the app locks the colors of the link.
+A link to a palette is `/p/<key>`, e.g. `/p/1kcvtvt` or `/p/1kcvtvt-c2-f5`:
+the seed in base 36, then the settings that differ from the defaults
+(`src/link.ts`). The key holds what makes the palette, not its colors: the app
+and the link preview make the palette from it with the model, so a change to
+the model can change the colors of an existing link. Older links with the key
+in the hash (`#<key>`) still open.
 On Cloudflare Pages, `functions/` gives such a link its preview: `/p/*` adds
-the Open Graph tags to the page, `/og/<colors>.png` draws the image
+the Open Graph tags to the page, `/og/<key>.png` draws the image
 (`src/og.ts`, made a PNG with resvg; Piazzolla instances in `public/fonts/`).
 
 ```sh
@@ -206,7 +209,7 @@ as whole circles that overlap like a chain, each on top of the next.
 
 ```
 data/            the palettes and near-neutrals (input of the fit), sources of the shapes and color names
-scripts/fit.py   fits src/core/params.json
+scripts/fit.py   fits src/core/params.ts
 scripts/*.mjs    build src/shapes.ts and public/colornames.txt
 src/core/        framework-free generator (color math, copula, palette, ramps, tokens, gradients, names)
 src/svg.ts       finds the colors of a pasted SVG and recolors it

@@ -6,7 +6,7 @@
 import { clamp, hueDiff, maxChroma, snap, wrapHue, type Lch } from "./color.ts";
 import type { Palette } from "./palette.ts";
 import { sampleQuantiles, sampleWeighted, type Rng } from "./random.ts";
-import params from "./params.json" with { type: "json" };
+import params from "./params.ts";
 
 export interface Canvases {
   paper: Lch;

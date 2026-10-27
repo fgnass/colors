@@ -2,7 +2,7 @@
 import { cusp, hueDiff, maxChroma, snap, type Lch } from "./color.ts";
 import { neutralAt, type Canvases } from "./canvas.ts";
 import { shift } from "./palette.ts";
-import params from "./params.json" with { type: "json" };
+import params from "./params.ts";
 
 export const STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950] as const;
 export type Step = (typeof STEPS)[number];
