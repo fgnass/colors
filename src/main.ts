@@ -6,7 +6,7 @@ import "./style.css";
 
 import type { CanvasKind, Canvases } from "./core/canvas.ts";
 import { contrast, cssOklch, fromHex, toGamut, toHex, type Lch } from "./core/color.ts";
-import { artSvg, fillRoles, type Art, type ArtColors } from "./art.ts";
+import { artSvg, fillRoles, iconSvg, type Art, type ArtColors } from "./art.ts";
 import { toCss, toJson, toTailwind } from "./core/export.ts";
 import { gradientCss, gradientFrom, type Gradient } from "./core/gradient.ts";
 import { colorName, loadNames, paletteName, uniqueNames } from "./core/names.ts";
@@ -122,6 +122,13 @@ function keyOf(e: Entry): string {
 /** the link to the palette shown */
 function writeLink(e: Entry) {
   history.replaceState(null, "", `/p/${linkKey(e)}`);
+}
+
+/** the favicon: the current palette's artwork in its colors */
+function writeIcon(e: Entry) {
+  const href = `data:image/svg+xml,${encodeURIComponent(iconSvg(e.art, e.palette))}`;
+  const link = document.querySelector<HTMLLinkElement>("link[rel=icon]")!;
+  if (link.href !== href) link.href = href;
 }
 
 // ---------- shortlist ----------
@@ -754,6 +761,7 @@ function render() {
   document.body.classList.toggle("settings-open", state.settings);
   if (state.view === "feed") {
     writeLink(e);
+    writeIcon(e);
     document.title = `${e.name} — Colors`;
   }
   document.querySelector("main")!.innerHTML = state.view === "grid" ? gridView() : feed();

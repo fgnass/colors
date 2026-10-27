@@ -100,6 +100,12 @@ export function artGroup(art: Art, p: Palette): string {
   return `<g transform="rotate(${art.rotate} ${c} ${c})">${paths}</g>`;
 }
 
+/** the palette as an icon (the favicon): the artwork on the main, in a rounded square */
+export function iconSvg(art: Art, p: Palette): string {
+  const pad = SHAPE_SIZE * 0.12, size = SHAPE_SIZE + 2 * pad;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-pad} ${-pad} ${size} ${size}"><rect x="${-pad}" y="${-pad}" width="${size}" height="${size}" rx="${size * 0.22}" fill="${toHex(p.main)}"/>${artGroup(art, p)}</svg>`;
+}
+
 export function artSvg(art: Art, p: Palette): string {
   return `<svg class="tile" viewBox="0 0 ${SHAPE_SIZE} ${SHAPE_SIZE}" style="left:${100 - SIZE}cqw;top:${TOP}cqw;width:${SIZE}cqw;height:${SIZE}cqw" aria-hidden="true">
     ${artGroup(art, p)}</svg>`;
