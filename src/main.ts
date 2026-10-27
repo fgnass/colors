@@ -6,7 +6,8 @@ import "./style.css";
 
 import type { CanvasKind, Canvases } from "./core/canvas.ts";
 import { contrast, cssOklch, fromHex, toGamut, toHex, type Lch } from "./core/color.ts";
-import { artSvg, fillRoles, iconSvg, type Art, type ArtColors } from "./art.ts";
+import { artSvg, fillRoles, type Art, type ArtColors } from "./art.ts";
+import { markSvg } from "./mark.ts";
 import { toCss, toJson, toTailwind } from "./core/export.ts";
 import { gradientCss, gradientFrom, type Gradient } from "./core/gradient.ts";
 import { colorName, loadNames, paletteName, uniqueNames } from "./core/names.ts";
@@ -124,9 +125,13 @@ function writeLink(e: Entry) {
   history.replaceState(null, "", `/p/${linkKey(e)}`);
 }
 
-/** the favicon: the current palette's artwork in its colors */
+/** the favicon: the mark in the current palette's colors, on its main, so it reads on any tab bar */
 function writeIcon(e: Entry) {
-  const href = `data:image/svg+xml,${encodeURIComponent(iconSvg(e.art, e.palette))}`;
+  const p = e.palette, main = hex(p.main);
+  // a ring too close to the main: the canvas that stands out more from it
+  const canvas = contrast(hex(e.canvas.ink), main) > contrast(hex(e.canvas.paper), main) ? hex(e.canvas.ink) : hex(e.canvas.paper);
+  const rings = [p.companion, p.light, p.anchor, p.dark].map(hex).map((c) => (contrast(c, main) < 1.5 ? canvas : c));
+  const href = `data:image/svg+xml,${encodeURIComponent(markSvg(rings, main))}`;
   const link = document.querySelector<HTMLLinkElement>("link[rel=icon]")!;
   if (link.href !== href) link.href = href;
 }
