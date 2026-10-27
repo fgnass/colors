@@ -841,7 +841,7 @@ function toggleSettings(open = !state.settings) {
 function mount() {
   const showButtons = SHOWS.map(([s, label]) => `<button data-show="${s}" class="${s === "details" ? "hide-l" : ""}" title="${label} (V)" aria-label="${label}">${ICONS[s]}</button>`).join("");
   document.querySelector("#app")!.innerHTML = `
-    <button class="wordmark" data-action="tour" title="Colors: the tour">Colors <i>for interfaces</i></button>
+    <button class="wordmark" data-action="tour" title="Colors: the tour">Colors</button>
     <main></main>
     <aside class="side" aria-label="Palette details"></aside>
     <nav class="bar">

@@ -39,8 +39,7 @@ body.grid main { overflow: auto; -webkit-overflow-scrolling: touch; }
 .wordmark { display: none; }
 @media (min-width: 980px) {
   .wordmark { display: block; position: fixed; left: 40px; top: 28px; z-index: 16; font: 600 20px/1 var(--serif); letter-spacing: -.01em; color: var(--wordmark, var(--ink)); transition: color .3s; text-align: left; }
-  .wordmark:hover i { text-decoration: underline; text-underline-offset: 3px; }
-  .wordmark i { font-weight: 300; }
+  .wordmark:hover { text-decoration: underline; text-underline-offset: 3px; }
   body.grid .wordmark { color: var(--ink); }
 }
 
