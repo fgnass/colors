@@ -3,7 +3,7 @@
 import { artGroup } from "./art.ts";
 import { contrast, toHex, type Lch } from "./core/color.ts";
 import { paletteName, uniqueNames } from "./core/names.ts";
-import { ROLES } from "./core/palette.ts";
+import { ROLES } from "./core/roles.ts";
 import type { Shared } from "./share.ts";
 import { SHAPE_SIZE } from "./shapes.ts";
 

@@ -5,7 +5,8 @@
 import type { Art } from "./art.ts";
 import type { Canvases } from "./core/canvas.ts";
 import { fromHex, toHex } from "./core/color.ts";
-import { ROLES, type Palette } from "./core/palette.ts";
+import type { Palette } from "./core/palette.ts";
+import { ROLES } from "./core/roles.ts";
 import { SHAPES } from "./shapes.ts";
 
 export interface Shared {
