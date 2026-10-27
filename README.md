@@ -3,7 +3,7 @@
 A palette generator for interfaces. Browse colors as artwork, gradients, and
 light or dark UI previews, then export the palette for your own project.
 
-[Try the live demo](https://colors.gnass.buzz)
+[Try the live demo](https://colors.gnass.buzz) · [Source on GitHub](https://github.com/fgnass/colors) · [Privacy](https://gnass.buzz/privacy)
 
 ![A generated palette shown as artwork, alongside its colors and scales](docs/preview.png)
 

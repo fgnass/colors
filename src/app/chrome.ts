@@ -6,6 +6,9 @@ import { MODES } from "./state.ts";
 
 const NEON_SPLASH = `<svg class="neon-splash" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4.6c1.5-.4 2 1.6 3.3 2.2 1.4.6 3.4-.4 4 1 .6 1.5-1.3 2.4-1.2 3.9.1 1.4 2.2 2.4 1.5 3.8-.7 1.4-2.8.6-4 1.5-1.2.9-1.2 3.1-2.8 3.2-1.5.1-1.8-2-3-2.9-1.2-.9-3.4-.5-3.9-2-.5-1.4 1.5-2.3 1.5-3.7 0-1.5-1.9-2.6-1.2-3.9.7-1.4 2.8-.4 4-1.2.8-.6 1-1.7 1.8-1.9Z"/><circle cx="20.2" cy="4.6" r="1.5"/><circle cx="3.6" cy="4.2" r="1.1"/><circle cx="21" cy="19.6" r="1.1"/><circle cx="4.4" cy="20.6" r="1.4"/></svg>`;
 
+const REPO_URL = "https://github.com/fgnass/colors";
+const PRIVACY_URL = "https://gnass.buzz/privacy";
+
 const capitalized = (s: string) => s[0].toUpperCase() + s.slice(1);
 
 function modeButtons(): string {
@@ -46,6 +49,10 @@ function settingsSheet(): string {
         <div><div class="label">Accessible tokens</div><div class="hint">Interface colors pass WCAG AA in light and dark mode; the palette stays as it is</div></div>
         <input id="accessible" type="checkbox"><span class="switch"></span>
       </label>
+      <div class="about">
+        <a href="${REPO_URL}" target="_blank" rel="noopener">Source on GitHub</a>
+        <a href="${PRIVACY_URL}" target="_blank" rel="noopener">Privacy</a>
+      </div>
     </section>`;
 }
 

@@ -399,6 +399,9 @@ body.settings-open .settings { transform: none; }
 .field.row { flex-direction: row; align-items: center; gap: 12px; }
 .field.row > div:first-child { flex: 1; }
 .hint { font-size: 12px; color: var(--ink-2); margin-top: 4px; }
+.settings .about { display: flex; gap: 16px; margin-top: -6px; font-size: 12px; }
+.settings .about a { color: var(--ink-2); text-decoration: none; }
+.settings .about a:hover { color: var(--ink); text-decoration: underline; }
 .hues { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .hues button { position: relative; width: 28px; height: 28px; border-radius: 50%; background: var(--dot); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .08); transition: transform .15s var(--ease); }
 .hues button:hover { transform: scale(1.12); }
