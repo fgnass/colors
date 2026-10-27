@@ -105,6 +105,8 @@ const state = {
   /** palette color chosen per SVG color (by its index), instead of the automatic one */
   svgRoles: {} as Record<number, SvgTarget>,
   settings: false,
+  /** the feed walks the shortlist from this place in it (a palette opened from the shortlist), else null */
+  walk: null as number | null,
 };
 const current = () => upToDate(state.index);
 
@@ -186,20 +188,48 @@ function remake(indices: number[], patch: Partial<Setting> = {}) {
   state.next = null;
 }
 
-/** the palette below the current one: the next in the feed, or a new one waiting */
+/** while the feed walks the shortlist: its palettes above and below the current one (none below: new ones follow) */
+function walkNeighbors(): { prev: number | null; next: number | null } | null {
+  if (state.walk === null) return null;
+  const j = state.shortlist.findIndex((f) => keyOf(f) === keyOf(current()));
+  // the current one taken off the list (or changed): its place is just before the walk's place
+  const [p, n] = j >= 0 ? [j - 1, j + 1] : [state.walk - 1, state.walk];
+  return { prev: p >= 0 ? p : null, next: n < state.shortlist.length ? n : null };
+}
+
+/** go to a palette of the shortlist, or (null) leave it for a new palette */
+function walkTo(i: number | null, e: Entry) {
+  state.walk = i;
+  push(e);
+}
+
+/** the palette below the current one: the next on the shortlist, the next in the feed, or a new one waiting */
 function nextEntry(): Entry {
-  if (state.index < state.history.length - 1) return upToDate(state.index + 1);
+  const w = walkNeighbors();
+  if (w?.next != null) return state.shortlist[w.next];
+  if (!w && state.index < state.history.length - 1) return upToDate(state.index + 1);
   if (!state.next) state.next = create(randomSeed(), current()?.locks ?? {});
   return state.next;
 }
 
+/** the palette above the current one, if any */
+function prevEntry(): Entry | null {
+  const w = walkNeighbors();
+  if (w) return w.prev === null ? null : state.shortlist[w.prev];
+  return state.index > 0 ? state.history[state.index - 1] : null;
+}
+
 function goNext() {
-  if (state.index < state.history.length - 1) { state.index++; render(); }
+  const w = walkNeighbors();
+  if (w) walkTo(w.next, nextEntry());
+  else if (state.index < state.history.length - 1) { state.index++; render(); }
   else push(nextEntry());
 }
 
 function goPrev() {
-  if (state.index > 0) { state.index--; render(); }
+  const w = walkNeighbors();
+  if (w) { if (w.prev !== null) walkTo(w.prev, state.shortlist[w.prev]); }
+  else if (state.index > 0) { state.index--; render(); }
 }
 
 function toggleLock(role: Lockable | CanvasKind) {
@@ -604,7 +634,7 @@ function fitUi() {
 
 function feed(): string {
   const e = current();
-  const prev = state.index > 0 ? state.history[state.index - 1] : null;
+  const prev = prevEntry();
   return `<div class="feed${showOf() === "details" ? " still" : ""}"><div class="track">
       ${prev ? `<div class="slot prev">${screen(prev)}</div>` : ""}
       <div class="slot cur">${screen(e)}</div>
@@ -714,6 +744,7 @@ const pageIndices = () => { const { start, entries } = page(); return entries.ma
 
 function openGrid() {
   state.view = "grid";
+  state.walk = null;
   state.gridFrom = "fresh";
   render();
 }
@@ -989,7 +1020,7 @@ function swipe() {
   const settle = (dir: 1 | -1 | 0) => {
     const t = track();
     if (!t) return;
-    const canGo = dir === 1 || (dir === -1 && state.index > 0);
+    const canGo = dir === 1 || (dir === -1 && prevEntry() !== null);
     if (!dir || !canGo) {
       t.style.transition = "transform .3s cubic-bezier(.2,.7,.2,1)";
       t.style.transform = "";
@@ -1022,7 +1053,7 @@ function swipe() {
     if (!dragging && Math.abs(dy) < 8) return;
     if (!dragging) { dragging = true; main.setPointerCapture(pointerId); }
     // nothing above the first palette: resist
-    const y = dy > 0 && state.index === 0 ? dy * 0.3 : dy;
+    const y = dy > 0 && !prevEntry() ? dy * 0.3 : dy;
     t.style.transform = `translateY(${y}px)`;
   });
   const end = (ev: PointerEvent) => {
@@ -1073,7 +1104,7 @@ document.addEventListener("click", (ev) => {
   else if (d.action === "newset") newSet();
   else if (d.action === "tour") { toggleSettings(false); if (state.view === "grid") { state.view = "feed"; render(); } tour(); }
   else if (d.tab) { state.tab = d.tab as Tab; render(); }
-  else if (d.pick) { const e = pick(Number(d.pick)); state.view = "feed"; push(e); }
+  else if (d.pick) { const i = Number(d.pick); state.view = "feed"; walkTo(state.gridFrom === "shortlist" ? i : null, pick(i)); }
   else if ("copyLink" in d) copy(location.href, "link");
   else if ("copyExport" in d) copy(exportText(current()), state.tab === "tailwind" ? "Tailwind theme" : state.tab === "scales" ? "CSS" : state.tab.toUpperCase());
 });
@@ -1142,7 +1173,7 @@ window.addEventListener("hashchange", () => {
   state.neon = h.neon;
   state.colors = h.colors ?? 2;
   if (h.accessible) state.accessible = true;
-  push(create(h.seed, h.locks, { ...state, mood: h.mood }));
+  walkTo(null, create(h.seed, h.locks, { ...state, mood: h.mood }));
 });
 
 const fromUrl = readHash();

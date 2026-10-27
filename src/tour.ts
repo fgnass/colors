@@ -92,7 +92,6 @@ export function startTour(host: TourHost) {
     lit(next?.at ? document.querySelector(next.at) : null);
     if (next === current) return;
     current = next;
-    if (current === null && !next) return;
     if (!next) {
       // all tried: a last line that stays until it is closed, or until the next thing is done in the app
       type("That's it. To see these hints again, use the ? button in the grid.",
