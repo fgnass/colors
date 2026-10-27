@@ -1,18 +1,37 @@
 // OKLCH <-> sRGB conversion, gamut mapping and contrast.
 
 export interface Lch {
-  l: number; // 0..1
-  c: number; // chroma
-  h: number; // degrees
+  /** lightness, 0..1 */
+  l: number;
+  /** chroma */
+  c: number;
+  /** hue in degrees */
+  h: number;
 }
+
+/** A color at least this colorful is clearly colored, not a tinted neutral. */
+export const CLEARLY_COLORED = 0.04;
 
 const srgbToLin = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
 const linToSrgb = (c: number) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
 
 export const wrapHue = (h: number) => ((h % 360) + 360) % 360;
-/** signed hue difference b - a in -180..180 */
+/** Signed hue difference b - a, in -180..180. */
 export const hueDiff = (a: number, b: number) => ((b - a + 540) % 360) - 180;
 export const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+/** OKLab coordinates [L, a, b] of a color. */
+export const toLab = (c: Lch): [number, number, number] => [
+  c.l,
+  c.c * Math.cos((c.h * Math.PI) / 180),
+  c.c * Math.sin((c.h * Math.PI) / 180),
+];
+
+/** Chroma and hue of OKLab coordinates a and b. */
+export const fromAb = (a: number, b: number): { c: number; h: number } => ({
+  c: Math.hypot(a, b),
+  h: wrapHue((Math.atan2(b, a) * 180) / Math.PI),
+});
 
 function lchToLinRgb({ l, c, h }: Lch): [number, number, number] {
   const a = c * Math.cos((h * Math.PI) / 180);
@@ -32,10 +51,12 @@ export function inGamut(lch: Lch): boolean {
 }
 
 const maxChromaCache = new Map<number, number>();
+
 /**
- * Highest in-gamut sRGB chroma for a lightness and hue, at 0.001 lightness
- * and 0.5° hue: made for the rounded values, so the result doesn't depend on
- * which nearby color filled the cache first.
+ * The highest in-gamut sRGB chroma at a lightness and hue.
+ * Lightness is rounded to 0.001 and hue to 0.5°, and the result is computed
+ * for the rounded values, so it does not depend on which nearby color filled
+ * the cache first.
  */
 export function maxChroma(l: number, h: number): number {
   const lk = Math.round(clamp(l, 0, 1) * 1000);
@@ -57,6 +78,7 @@ export function maxChroma(l: number, h: number): number {
 }
 
 const cuspCache = new Map<number, { l: number; c: number }>();
+
 /** The most chromatic in-gamut color of a hue: its lightness and chroma. */
 export function cusp(h: number): { l: number; c: number } {
   const key = Math.round(wrapHue(h) * 2);
@@ -81,7 +103,13 @@ export function toGamut(lch: Lch): Lch {
 
 export function toHex(lch: Lch): string {
   const rgb = lchToLinRgb(toGamut(lch)).map((v) => Math.round(clamp(linToSrgb(clamp(v, 0, 1)), 0, 1) * 255));
-  return "#" + rgb.map((v) => v.toString(16).padStart(2, "0")).join("").toUpperCase();
+  return (
+    "#" +
+    rgb
+      .map((v) => v.toString(16).padStart(2, "0"))
+      .join("")
+      .toUpperCase()
+  );
 }
 
 export function fromHex(hex: string): Lch {
@@ -93,16 +121,15 @@ export function fromHex(hex: string): Lch {
   const L = 0.2104542553 * l_ + 0.793617785 * m_ - 0.0040720468 * s_;
   const A = 1.9779984951 * l_ - 2.428592205 * m_ + 0.4505937099 * s_;
   const B = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.808675766 * s_;
-  return { l: L, c: Math.hypot(A, B), h: wrapHue((Math.atan2(B, A) * 180) / Math.PI) };
+  return { l: L, ...fromAb(A, B) };
 }
 
-/** Round-trip through sRGB hex so all values describe a displayable color. */
+/** Round-trip through sRGB hex, so all values describe a displayable color. */
 export const snap = (lch: Lch): Lch => fromHex(toHex(lch));
 
-/** OKLab distance: a vivid color stands out from a pale one even at equal lightness */
+/** OKLab distance. Unlike a hue difference, it tells a vivid color from a pale one at equal lightness. */
 export function distance(a: Lch, b: Lch): number {
-  const ab = (c: Lch) => [c.l, c.c * Math.cos((c.h * Math.PI) / 180), c.c * Math.sin((c.h * Math.PI) / 180)];
-  const [x, y] = [ab(a), ab(b)];
+  const [x, y] = [toLab(a), toLab(b)];
   return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]);
 }
 
@@ -114,13 +141,18 @@ function luminance(hex: string): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-/** WCAG 2 contrast ratio */
+/** WCAG 2 contrast ratio. */
 export function contrast(a: string, b: string): number {
   const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
   return (x + 0.05) / (y + 0.05);
 }
 
-/** APCA lightness contrast Lc (text on background), 0.0.98G constants */
+/** The color of `options` with the highest WCAG 2 contrast against `bg`. */
+export function mostContrasting(bg: string, options: string[]): string {
+  return options.reduce((a, b) => (contrast(b, bg) > contrast(a, bg) ? b : a));
+}
+
+/** APCA lightness contrast Lc of text on a background (0.0.98G constants). */
 export function apca(text: string, bg: string): number {
   const y = (hex: string) => {
     const h = hex.replace("#", "");

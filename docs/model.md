@@ -20,12 +20,12 @@ is fitted to stay the same.
 
 Every palette has five roles:
 
-| Role | What the data shows |
-|---|---|
-| **main** | mid lightness, usually the most chromatic color |
-| **companion** | any hue, but a similar weight (lightness, chroma) to the main |
-| **anchor** | the lightness pole; often off-white, cream or near-black |
-| **light / dark** | tints of the main, same hue, slightly less chroma |
+| Role             | What the data shows                                           |
+| ---------------- | ------------------------------------------------------------- |
+| **main**         | mid lightness, usually the most chromatic color               |
+| **companion**    | any hue, but a similar weight (lightness, chroma) to the main |
+| **anchor**       | the lightness pole; often off-white, cream or near-black      |
+| **light / dark** | tints of the main, same hue, slightly less chroma             |
 
 - **Hue is free.** Hue distances between roles are indistinguishable from
   random. The main hue follows the dataset's hue preference, conditioned on
@@ -92,16 +92,17 @@ Every palette has five roles:
   cool ink and a cream paper meet in grey (not in olive).
 - **Light / dark themes**: the most colorful palette color is the loud one and
   appears only in small fills (main action, logo, badge, today's bar, toggle),
-  always as itself, with text in a dark shade of the second color's hue. Its
-  own tint is the second data series and the toggle knob; the next color,
-  darkened in its hue until white text reads, marks tags and the avatar.
+  always as itself, with text in a dark shade of the second color's hue or in
+  light text, whichever reads better by APCA. The next palette color is the
+  first data series and the toggle knob, a third one the second series; without
+  a colored one the series are neutral. Tags, avatar and the secondary button
+  take the background color, so they stay neutral.
   Light background: a light, almost neutral palette color
   when there is one, with cards near white in its hue; else `neutral-100`
-  (tinted by the palette) with white cards. A dark palette color that
-  is neither the loud nor the second color fills the secondary button, the same
-  in both modes. In dark mode the background is a deep version (L 0.2) of the
-  darkest colored palette color (C ≥ 0.04), else the darkest neutral
-  (`neutral-950`), with cards a little lighter.
+  (tinted by the palette) with white cards. In dark mode the background is a
+  deep version (L 0.2) of the darkest colored palette color (C ≥ 0.04) among
+  the loud one and the series, else the darkest neutral (`neutral-950`), with
+  cards a little lighter.
 - **Gradient**: one fixed composition (`COMPOSITION` in
   `src/core/gradient.ts`): the bottom color as a field, the glow color above a
   soft U-shaped edge (deepest left of the middle, flat), the top color as a
@@ -154,4 +155,3 @@ Each color gets the name of the nearest named color (OKLab) from
 [meodai/color-names](https://github.com/meodai/color-names), filtered to names
 of one or two words where one word is a basic color word from the English
 "Many Languages, Many Colors" list. Names stay unique within a palette.
-

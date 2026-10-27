@@ -35,7 +35,13 @@ test("SVG CSS stays isolated and resolved colors survive recoloring", async ({ p
     const before = getComputedStyle(document.body).backgroundColor;
     const art = await analyzeSvg(text);
     observer.disconnect();
-    return { before, during: bodyDuringMeasurement, colors: art.colors, output: recolorSvg(art, ["#123456"]), frames: document.querySelectorAll("iframe").length };
+    return {
+      before,
+      during: bodyDuringMeasurement,
+      colors: art.colors,
+      output: recolorSvg(art, ["#123456"]),
+      frames: document.querySelectorAll("iframe").length,
+    };
   }, SVG);
   expect(result.during).toBe(result.before);
   expect(result.colors).toEqual([{ hex: "#ff0000", area: 160000 }]);
@@ -53,7 +59,8 @@ test("SVG analysis blocks external resources and removes active content from exp
   });
   const output = await page.evaluate(async () => {
     const { analyzeSvg } = await import("/src/svg.ts");
-    const art = await analyzeSvg(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" onload="window.__svgExecuted=true">
+    const art =
+      await analyzeSvg(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" onload="window.__svgExecuted=true">
       <script>parent.__svgExecuted=true</script>
       <foreignObject><div xmlns="http://www.w3.org/1999/xhtml">HTML</div></foreignObject>
       <style>@import url('https://svg-import.invalid/style.css'); rect { fill: url('https://svg-import.invalid/paint.svg#p') red; }</style>
@@ -98,21 +105,21 @@ test("SVG sample and user imports render through the app", async ({ page }) => {
   await expect(page.locator(".toast")).toHaveText("SVG with 1 color");
 });
 
-
 test("SVG snippets preserve CSS geometry without retaining stylesheets", async ({ page }) => {
   await page.goto("/p/1kcvtvt");
   const output = await page.evaluate(async () => {
     const { analyzeSvg } = await import("/src/svg.ts");
-    const art = await analyzeSvg(`<svg viewBox="0 0 100 100"><style>rect { x: 10px; width: 50px; height: 25px; transform: translateX(5px); fill: #ff0000 }</style><rect/></svg>`);
+    const art = await analyzeSvg(
+      `<svg viewBox="0 0 100 100"><style>rect { x: 10px; width: 50px; height: 25px; transform: translateX(5px); fill: #ff0000 }</style><rect/></svg>`,
+    );
     return { colors: art.colors, template: art.template };
   });
   expect(output.colors).toEqual([{ hex: "#ff0000", area: 20000 }]);
-  expect(output.template).toContain("xmlns=\"http://www.w3.org/2000/svg\"");
+  expect(output.template).toContain('xmlns="http://www.w3.org/2000/svg"');
   expect(output.template).toContain("width:50px");
   expect(output.template).toContain("transform:matrix(1, 0, 0, 1, 5, 0)");
   expect(output.template).not.toContain("<style");
 });
-
 
 test("legacy shortlist keys migrate without losing saved palettes", async ({ page }) => {
   await page.addInitScript(() => {

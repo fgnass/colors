@@ -8,7 +8,9 @@ test("copy feedback waits for the clipboard write", async () => {
   const pending = copyText("#123456", "color", (message) => messages.push(message), {
     writeText: (text) => {
       assert.equal(text, "#123456");
-      return new Promise<void>((resolve) => { complete = resolve; });
+      return new Promise<void>((resolve) => {
+        complete = resolve;
+      });
     },
   });
   assert.deepEqual(messages, []);
@@ -20,7 +22,9 @@ test("copy feedback waits for the clipboard write", async () => {
 test("clipboard errors never report success", async () => {
   const messages: string[] = [];
   await copyText("text", "text", (message) => messages.push(message), {
-    writeText: async () => { throw new Error("Permission denied"); },
+    writeText: async () => {
+      throw new Error("Permission denied");
+    },
   });
   assert.deepEqual(messages, ["Could not copy. Please try again."]);
 });

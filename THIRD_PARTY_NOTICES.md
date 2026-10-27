@@ -65,7 +65,7 @@ The color naming data is derived from the "Many Languages, Many Colors" research
 project by the UW Interactive Data Lab:
 
   Younghoon Kim, Kyle Thayer, Gabriella Silva Gorsky, and Jeffrey Heer
-  "Color Names Across Languages: Salient Colors and Term Translation in 
+  "Color Names Across Languages: Salient Colors and Term Translation in
   Multilingual Color Naming Models"
   EuroVis 2019
 

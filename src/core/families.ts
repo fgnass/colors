@@ -27,7 +27,7 @@ const DRIFT_MAX = 90; // degrees per 1.0 of lightness
 const DRIFT_FROM = 0.57; // cusp lightness at which the weight starts …
 const DRIFT_FULL = 0.74; // … and where it is full
 
-/** lightness of the most chromatic color of a hue (ternary search, the chroma is unimodal in L) */
+/** Lightness of the most chromatic color of a hue (ternary search; the chroma is unimodal in L). */
 function cuspL(h: number): number {
   let lo = 0.25;
   let hi = 1;
@@ -46,7 +46,7 @@ const DRIFT = Array.from({ length: 360 }, (_, h) => {
   return DRIFT_MAX * Math.tanh((DRIFT_STRENGTH * slope * weight) / DRIFT_MAX);
 });
 
-/** Hue drift (degrees per unit lightness) at a hue. */
+/** Hue drift in degrees per unit of lightness, at a hue. */
 export function driftAt(h: number): number {
   const x = wrapHue(h);
   const i = Math.floor(x);

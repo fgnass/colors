@@ -3,7 +3,7 @@ import { cssOklch, toHex } from "./color.ts";
 import type { Canvases } from "./canvas.ts";
 import type { Palette } from "./palette.ts";
 import { STEPS } from "./ramp.ts";
-import type { Scales, Theme } from "./tokens.ts";
+import type { Scales, Theme, Themes } from "./tokens.ts";
 
 const kebab = (s: string) => s.replace(/[A-Z]/g, (m) => "-" + m.toLowerCase());
 
@@ -13,10 +13,14 @@ function scaleLines(sc: Scales, prefix: string, fmt: (s: string, step: number, v
   );
 }
 
+/** The palette's colors and canvases, by name. */
 const brand = (p: Palette, cv: Canvases) => Object.entries({ ...p, ...cv });
 
-export function toCss(p: Palette, cv: Canvases, sc: Scales, t: { light: Theme; dark: Theme }, gradient?: string): string {
-  const tokens = (th: Theme) => Object.entries(th).map(([k, v]) => `  --${kebab(k)}: ${v};`).join("\n");
+export function toCss(p: Palette, cv: Canvases, sc: Scales, t: Themes, gradient?: string): string {
+  const tokens = (th: Theme) =>
+    Object.entries(th)
+      .map(([k, v]) => `  --${kebab(k)}: ${v};`)
+      .join("\n");
   return [
     ":root {",
     ...brand(p, cv).map(([k, v]) => `  --brand-${k}: ${cssOklch(v)}; /* ${toHex(v)} */`),
@@ -33,10 +37,10 @@ export function toCss(p: Palette, cv: Canvases, sc: Scales, t: { light: Theme; d
   ].join("\n");
 }
 
-/** the gradient (a `background` value whose last layer may be a plain color) as a `background-image` value */
+/** The gradient, a `background` value whose last layer may be a plain color, as a `background-image` value. */
 const asImage = (gradient: string) => gradient.replace(/, (#[0-9a-f]{6})$/i, ", linear-gradient($1, $1)");
 
-/** a Tailwind v4 theme: `--color-*` for the colors and scales, `--background-image-brand` (the `bg-brand` utility) for the gradient */
+/** A Tailwind v4 theme: `--color-*` for the colors and scales, `--background-image-brand` (the `bg-brand` utility) for the gradient. */
 export function toTailwind(p: Palette, cv: Canvases, sc: Scales, gradient?: string): string {
   return [
     "@theme {",
@@ -47,7 +51,7 @@ export function toTailwind(p: Palette, cv: Canvases, sc: Scales, gradient?: stri
   ].join("\n");
 }
 
-export function toJson(p: Palette, cv: Canvases, sc: Scales, t: { light: Theme; dark: Theme }): string {
+export function toJson(p: Palette, cv: Canvases, sc: Scales, t: Themes): string {
   const hexScale = (r: Scales[keyof Scales]) => Object.fromEntries(STEPS.map((s) => [s, toHex(r[s])]));
   return JSON.stringify(
     {

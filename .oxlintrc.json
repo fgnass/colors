@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc"],
+  "categories": { "correctness": "error", "suspicious": "warn" },
+  "rules": {
+    "no-unused-vars": "error",
+    "no-shadow": "warn",
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "prefer-const": "error",
+    "no-var": "error",
+    "no-sequences": "error",
+    "max-lines-per-function": ["warn", { "max": 80, "skipBlankLines": true, "skipComments": true }],
+    "typescript/consistent-type-imports": "error",
+    "unicorn/no-array-sort": "off",
+    "unicorn/no-array-reverse": "off",
+    "unicorn/consistent-function-scoping": "off",
+    "oxc/approx-constant": "off",
+    "no-underscore-dangle": "off"
+  },
+  "ignorePatterns": ["dist", "node_modules", "src/core/params.ts", "src/shapes.ts", "scripts/__pycache__"],
+  "overrides": [{ "files": ["**/*.test.ts", "tests/**", "scripts/**"], "rules": { "max-lines-per-function": "off" } }]
+}

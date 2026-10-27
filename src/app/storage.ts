@@ -1,4 +1,4 @@
-// Browser storage is optional; unavailable or malformed values fall back to defaults.
+// Browser storage is optional: unavailable or malformed values fall back to defaults.
 import { fromHex } from "../core/color.ts";
 import type { CanvasKind } from "../core/canvas.ts";
 import type { ArtColors } from "../art.ts";
@@ -17,10 +17,13 @@ export function writeStored(key: string, value: string | null): void {
   try {
     if (value === null) localStorage.removeItem(key);
     else localStorage.setItem(key, value);
-  } catch { /* The app remains usable when storage is unavailable or full. */ }
+  } catch {
+    // The app stays usable when storage is unavailable or full.
+  }
 }
 
-export function parseLegacyKey(hash: string): { seed: number; locks: AllLocks; mood: number; families: string[]; neon: boolean; colors?: ArtColors; accessible: boolean } | null {
+/** An old link key, from before the keys moved to the path: #<seed>~<locks>;<option><value>… */
+export function parseLegacyKey(hash: string): (Omit<Key, "colors"> & { colors?: ArtColors }) | null {
   const match = hash.match(/^#([0-9a-z]+)(?:~([^;]*))?((?:;[a-z]-?\d+)*)$/i);
   if (!match) return null;
   const options = Object.fromEntries(
@@ -29,7 +32,8 @@ export function parseLegacyKey(hash: string): { seed: number; locks: AllLocks; m
   const locks: AllLocks = {};
   for (const part of (match[2] ?? "").split(",").filter(Boolean)) {
     const [letter, value] = part.split(":");
-    const role = { m: "main", c: "companion", a: "anchor", p: "paper", i: "ink" }[letter] as Lockable | CanvasKind | undefined;
+    const role = { m: "main", c: "companion", a: "anchor", p: "paper", i: "ink" }[letter] as
+      Lockable | CanvasKind | undefined;
     if (role && /^[0-9a-f]{6}$/i.test(value)) locks[role] = fromHex("#" + value);
   }
   const colors = [2, 3, 4].includes(options.c) ? (options.c as ArtColors) : undefined;
@@ -37,24 +41,31 @@ export function parseLegacyKey(hash: string): { seed: number; locks: AllLocks; m
   const families = [options.f, options.g].map((i) => HUE_FAMILIES[i]?.name).filter((f): f is string => !!f);
   return {
     seed: parseInt(match[1], 36),
-    locks, mood, families, colors,
+    locks,
+    mood,
+    families,
+    colors,
     neon: options.n === 1,
     accessible: options.a === 1,
   };
 }
 
-/** Palette identity excludes preferences that only change its presentation. */
+/** A palette's identity, without the preferences that only change its presentation. */
 export const paletteIdentity = (key: Key) => linkKey({ ...key, colors: 3, accessible: false });
 
-/** Read old hash-based shortlists as well as current path keys. */
+export const SHORTLIST_KEY = "colors.shortlist";
+
+/** The shortlist's keys: current path keys, and old hash-based ones. */
 export function readShortlist(): (Omit<Key, "colors"> & { colors?: ArtColors })[] {
   try {
-    const keys: unknown = JSON.parse(readStored("colors.shortlist") ?? "[]");
+    const keys: unknown = JSON.parse(readStored(SHORTLIST_KEY) ?? "[]");
     if (!Array.isArray(keys)) return [];
     return keys.flatMap((key) => {
       if (typeof key !== "string") return [];
       const parsed = key.startsWith("#") ? parseLegacyKey(key) : parseLink(key);
       return parsed ? [parsed] : [];
     });
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }

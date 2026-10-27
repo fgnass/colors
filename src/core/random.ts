@@ -5,7 +5,7 @@ export interface Rng {
   seed: number;
 }
 
-/** mulberry32 */
+/** A mulberry32 generator. */
 export function createRng(seed: number): Rng {
   let a = seed >>> 0;
   const rng = (() => {
@@ -28,6 +28,7 @@ export function sampleQuantiles(rng: () => number, qs: readonly number[]): numbe
   return qs[i] + (qs[i + 1] - qs[i]) * (u - i);
 }
 
+/** The index of a weight, drawn with probability proportional to it. */
 export function sampleWeighted(rng: () => number, weights: readonly number[]): number {
   const total = weights.reduce((a, b) => a + b, 0);
   let u = rng() * total;

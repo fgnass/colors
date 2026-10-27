@@ -18,7 +18,12 @@ export const onRequestGet: PagesFunction<Env, "file"> = async ({ request, env, p
   if (hit) return hit;
 
   ready ??= initWasm(wasm);
-  fonts ??= Promise.all(FONTS.map(async (f) => new Uint8Array(await (await env.ASSETS.fetch(new URL(`/fonts/${f}.ttf`, request.url))).arrayBuffer())));
+  fonts ??= Promise.all(
+    FONTS.map(
+      async (f) =>
+        new Uint8Array(await (await env.ASSETS.fetch(new URL(`/fonts/${f}.ttf`, request.url))).arrayBuffer()),
+    ),
+  );
   const [, fontBuffers] = await Promise.all([ready, fonts, names(env, request)]);
   const opts = { font: { fontBuffers, loadSystemFonts: false, defaultFontFamily: "Piazzolla" } };
 

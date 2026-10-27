@@ -58,14 +58,14 @@ Images, embedded HTML, and animation are removed; artwork should be self-contain
 
 ## Keyboard shortcuts
 
-| Key | Action |
-| --- | --- |
+| Key               | Action                                              |
+| ----------------- | --------------------------------------------------- |
 | Space / N / ↓ / → | Next palette; Space / N makes a new set in the grid |
-| ↑ / ← | Previous palette |
-| V | Cycle views |
-| G | Toggle grid |
-| F | Star the current palette |
-| S | Open the shortlist |
-| C | Cycle the artwork's color count |
-| 1–5 | Toggle main, companion, anchor, paper, or ink lock |
-| Esc | Close settings, toggle the grid, or end the tour |
+| ↑ / ←             | Previous palette                                    |
+| V                 | Cycle views                                         |
+| G                 | Toggle grid                                         |
+| F                 | Star the current palette                            |
+| S                 | Open the shortlist                                  |
+| C                 | Cycle the artwork's color count                     |
+| 1–5               | Toggle main, companion, anchor, paper, or ink lock  |
+| Esc               | Close settings, toggle the grid, or end the tour    |

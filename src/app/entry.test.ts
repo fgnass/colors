@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createEntry, LOCKABLE, toggleEntryLock, type Entry } from "./entry.ts";
+import { colorOf, createEntry, LOCKABLE, toggleEntryLock, type Entry } from "./entry.ts";
 import { linkKey, make, parseLink } from "../link.ts";
 import { toHex } from "../core/color.ts";
 
@@ -21,7 +21,7 @@ test("locking and unlocking each role keeps the displayed entry reproducible", (
     assert.ok(key);
     let entry = createEntry(key);
     for (const role of LOCKABLE) {
-      const color = role === "paper" || role === "ink" ? entry.canvas[role] : entry.palette[role];
+      const color = colorOf(entry, role);
       entry = toggleEntryLock(entry, role);
       assert.equal(toHex(entry.locks[role]!), toHex(color));
       assertReproducible(entry);

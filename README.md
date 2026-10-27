@@ -29,13 +29,15 @@ No accounts or API keys are needed to run the app.
 
 ```sh
 npm test                 # deterministic generation, link round trips, contrast, clipboard
+npm run lint             # oxlint, and Prettier in check mode
+npm run format           # Prettier
 npm run build            # type-check client and server, then build the app
 npx playwright install chromium
 npm run test:browser     # SVG isolation, imports, shared links, and shortlist restoration
 ```
 
-GitHub Actions runs the tests, production build, and Chromium checks on pushes
-and pull requests.
+GitHub Actions runs the linter, the tests, the production build, and the
+Chromium checks on pushes and pull requests.
 
 Generated data is checked in, so these commands are only needed when changing
 its sources:
@@ -66,18 +68,25 @@ Cloudflare authentication and a Pages project; review `wrangler.toml` for your s
 The generator is framework-free TypeScript. The browser app uses DOM APIs and
 CSS; Pages Functions render social images with resvg.
 
-| Path | Responsibility |
-| --- | --- |
-| [`src/core/`](src/core/) | Color math, statistical sampling, ramps, gradients, and tokens |
-| [`src/app/entry.ts`](src/app/entry.ts) | Build a complete entry from explicit generation settings |
-| [`src/app/storage.ts`](src/app/storage.ts) | Persistence and compatibility with older saved keys |
-| [`src/app/ui.ts`](src/app/ui.ts) | Light and dark interface preview templates |
-| [`src/app/swipe.ts`](src/app/swipe.ts) | Pointer, wheel, and keyboard navigation transitions |
-| [`src/main.ts`](src/main.ts) | App state, screens, and interaction wiring |
-| [`src/link.ts`](src/link.ts) | Shared-palette keys and deterministic generation |
-| [`src/svg.ts`](src/svg.ts) | Isolated SVG analysis and recoloring |
-| [`functions/`](functions/) | Shared-page metadata and PNG previews |
-| [`data/`](data/) / [`scripts/`](scripts/) | Model inputs and asset generation |
+| Path                                       | Responsibility                                                   |
+| ------------------------------------------ | ---------------------------------------------------------------- |
+| [`src/core/`](src/core/)                   | Color math, statistical sampling, ramps, gradients, and tokens   |
+| [`src/app/state.ts`](src/app/state.ts)     | The app's state: the feed, the shortlist, the view, the settings |
+| [`src/app/entry.ts`](src/app/entry.ts)     | Build a complete entry from explicit generation settings         |
+| [`src/app/feed.ts`](src/app/feed.ts)       | Moving through the feed and the shortlist                        |
+| [`src/app/grid.ts`](src/app/grid.ts)       | The grid: layout, paging, and its view                           |
+| [`src/app/screens.ts`](src/app/screens.ts) | The screens of the feed and the grid tiles                       |
+| [`src/app/details.ts`](src/app/details.ts) | The palette details, scales, and export panel                    |
+| [`src/app/svgArt.ts`](src/app/svgArt.ts)   | Your SVG: color mapping, loading, and storage                    |
+| [`src/app/render.ts`](src/app/render.ts)   | One render of the whole view                                     |
+| [`src/app/storage.ts`](src/app/storage.ts) | Persistence and compatibility with older saved keys              |
+| [`src/app/ui.ts`](src/app/ui.ts)           | Light and dark interface preview templates                       |
+| [`src/app/swipe.ts`](src/app/swipe.ts)     | Pointer, wheel, and keyboard navigation transitions              |
+| [`src/main.ts`](src/main.ts)               | Actions, event handlers, and start-up                            |
+| [`src/link.ts`](src/link.ts)               | Shared-palette keys and deterministic generation                 |
+| [`src/svg.ts`](src/svg.ts)                 | Isolated SVG analysis and recoloring                             |
+| [`functions/`](functions/)                 | Shared-page metadata and PNG previews                            |
+| [`data/`](data/) / [`scripts/`](scripts/)  | Model inputs and asset generation                                |
 
 Read the [usage guide](docs/usage.md), [model explanation](docs/model.md), or
 [rule-by-rule walkthrough](docs/algorithm.html). The walkthrough works locally

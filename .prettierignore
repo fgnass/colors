@@ -1,0 +1,9 @@
+dist
+node_modules
+src/core/params.ts
+src/shapes.ts
+public/colornames.txt
+package-lock.json
+data
+*.css
+*.html
