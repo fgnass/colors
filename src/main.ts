@@ -4,51 +4,43 @@ import "@fontsource-variable/instrument-sans/index.css";
 import "@fontsource-variable/jetbrains-mono/index.css";
 import "./style.css";
 
-import type { CanvasKind, Canvases } from "./core/canvas.ts";
-import { contrast, cssOklch, fromHex, toGamut, toHex, type Lch } from "./core/color.ts";
-import { artSvg, fillRoles, type Art, type ArtColors } from "./art.ts";
-import { markSvg } from "./mark.ts";
+import type { CanvasKind } from "./core/canvas.ts";
+import { contrast, cssOklch, toGamut, toHex, type Lch } from "./core/color.ts";
+import { artSvg, fillRoles, type ArtColors } from "./art.ts";
+import { markSvg, ringColors } from "./mark.ts";
 import { toCss, toJson, toTailwind } from "./core/export.ts";
-import { gradientCss, gradientFrom, type Gradient } from "./core/gradient.ts";
-import { colorName, loadNames, paletteName, uniqueNames } from "./core/names.ts";
-import { HUE_FAMILIES, isNeon, ROLES, type Lockable, type Palette, type Role } from "./core/palette.ts";
+import { gradientCss } from "./core/gradient.ts";
+import { colorName, loadNames } from "./core/names.ts";
+import { HUE_FAMILIES, isNeon, ROLES, type Lockable, type Role } from "./core/palette.ts";
 import { nearestStep, STEPS } from "./core/ramp.ts";
-import { createRng, randomSeed } from "./core/random.ts";
-import { scales, themes, type Scales, type Theme } from "./core/tokens.ts";
-import { keyOfPath, linkKey, make, parseLink, type AllLocks, type Key } from "./link.ts";
+import { randomSeed } from "./core/random.ts";
+import type { Scales, Theme } from "./core/tokens.ts";
+import { keyOfPath, linkKey, parseLink, type AllLocks, type Key } from "./link.ts";
 import { analyzeSvg, recolorSvg, svgUri, type SvgArt } from "./svg.ts";
 import { endTour, startTour, tourActive, type TourHost } from "./tour.ts";
 
+import { createEntry, toggleEntryLock, LOCKABLE, ROLE_ORDER, type Entry } from "./app/entry.ts";
+import { attachSwipe } from "./app/swipe.ts";
+import { copyText } from "./app/clipboard.ts";
+import { mobileUi, desktopUi } from "./app/ui.ts";
+import { paletteIdentity as keyOf, parseLegacyKey, readShortlist, readStored, writeStored } from "./app/storage.ts";
+
 // ---------- model ----------
 
-interface Entry extends Key {
-  palette: Palette;
-  canvas: Canvases;
-  gradient: Gradient;
-  art: Art;
-  name: string;
-  names: Record<Role | CanvasKind, string>;
-  scales: Scales;
-  themes: { light: Theme; dark: Theme };
+type Setting = Pick<Key, "families" | "neon"> & Partial<Pick<Key, "mood">>;
+
+/** The controller supplies global display preferences explicitly to the entry model. */
+function create(seed: number, locks: AllLocks, settings: Setting): Entry {
+  return createEntry({
+    seed, locks,
+    mood: settings.mood ?? 0,
+    families: settings.families,
+    neon: settings.neon,
+    colors: state.colors,
+    accessible: state.accessible,
+  });
 }
 
-/** what a palette is made with, besides seed and locks */
-/** mood: only from old links, new palettes are as in the data */
-type Setting = { mood?: number; families: string[]; neon: boolean };
-
-function create(seed: number, locks: AllLocks = {}, { mood = 0, families, neon }: Setting = state): Entry {
-  const { colors, accessible } = state;
-  const { palette, plain, canvas, art } = make({ seed, locks, mood, families, neon, colors });
-  // the palette colors in use, the same everywhere: the plate's (main + its fill colors)
-  const roles: Role[] = ["main", ...fillRoles(plain, colors - 1)];
-  const gradient = gradientFrom(palette, roles);
-  const sc = scales(palette, canvas);
-  const names = uniqueNames([...ROLE_ORDER.map((r) => [r, palette[r]] as [Role, Lch]), ["paper", canvas.paper], ["ink", canvas.ink]]);
-  return { seed, locks, mood, families, neon, colors, accessible, palette, canvas, gradient, art, names, name: paletteName(names.main, names.companion), scales: sc, themes: themes(palette, canvas, sc, roles, accessible) };
-}
-
-const LOCKABLE: (Lockable | CanvasKind)[] = ["main", "companion", "anchor", "paper", "ink"];
-const ROLE_ORDER: Role[] = ["main", "companion", "anchor", "light", "dark"];
 const ROLE_INFO: Record<Role, string> = {
   main: "Main", companion: "Companion", anchor: "Anchor", light: "Main · light", dark: "Main · dark",
 };
@@ -94,43 +86,15 @@ function upToDate(i: number): Entry {
   return e.colors === state.colors && e.accessible === state.accessible ? e : (state.history[i] = create(e.seed, e.locks, e));
 }
 
-function parseKey(hash: string): { seed: number; locks: AllLocks; mood: number; families: string[]; neon: boolean; colors?: ArtColors; accessible: boolean } | null {
-  const m = hash.match(/^#([0-9a-z]+)(?:~([^;]*))?((?:;[a-z]-?\d+)*)$/i);
-  if (!m) return null;
-  const opt = Object.fromEntries([...(m[3] ?? "").matchAll(/;([a-z])(-?\d+)/gi)].map((x) => [x[1], Number(x[2])]));
-  const locks: AllLocks = {};
-  for (const part of (m[2] ?? "").split(",").filter(Boolean)) {
-    const [k, v] = part.split(":");
-    const role = { m: "main", c: "companion", a: "anchor", p: "paper", i: "ink" }[k] as Lockable | CanvasKind | undefined;
-    if (role && /^[0-9a-f]{6}$/i.test(v)) locks[role] = fromHex("#" + v);
-  }
-  const colors = [2, 3, 4].includes(opt.c) ? (opt.c as ArtColors) : undefined;
-  const mood = Number.isFinite(opt.m) ? Math.max(-1, Math.min(1, opt.m / 100)) : 0;
-  const families = [opt.f, opt.g].map((i) => HUE_FAMILIES[i]?.name).filter((f): f is string => !!f);
-  return { seed: parseInt(m[1], 36), locks, mood, families, neon: opt.n === 1, colors, accessible: opt.a === 1 };
-}
-
-const readHash = () => parseKey(location.hash);
-
-/** what makes a palette: seed, locks, mood, hue families and neon (not the artwork's color count) */
-function keyOf(e: Entry): string {
-  const locks = (Object.entries(e.locks) as [string, Lch][]).map(([k, c]) => `${k[0]}:${hex(c).slice(1)}`).join(",");
-  const mood = e.mood ? `;m${Math.round(e.mood * 100)}` : "";
-  const fams = e.families.map((f, i) => `;${"fg"[i]}${HUE_FAMILIES.findIndex((h) => h.name === f)}`).join("");
-  return `#${e.seed.toString(36)}${locks ? "~" + locks : ""}${mood}${fams}${e.neon ? ";n1" : ""}`;
-}
-
 /** the link to the palette shown */
 function writeLink(e: Entry) {
   history.replaceState(null, "", `/p/${linkKey(e)}`);
 }
 
-/** the favicon: the mark in the current palette's colors, on its main, so it reads on any tab bar */
+/** the favicon: the mark in the current palette's colors, on its main */
 function writeIcon(e: Entry) {
   const p = e.palette, main = hex(p.main);
-  // a ring too close to the main: the canvas that stands out more from it
-  const canvas = contrast(hex(e.canvas.ink), main) > contrast(hex(e.canvas.paper), main) ? hex(e.canvas.ink) : hex(e.canvas.paper);
-  const rings = [p.companion, p.light, p.anchor, p.dark].map(hex).map((c) => (contrast(c, main) < 1.5 ? canvas : c));
+  const rings = ringColors(main, [p.companion, p.light, p.anchor, p.dark].map(hex), [hex(e.canvas.ink), hex(e.canvas.paper)]);
   const href = `data:image/svg+xml,${encodeURIComponent(markSvg(rings, main))}`;
   const link = document.querySelector<HTMLLinkElement>("link[rel=icon]")!;
   if (link.href !== href) link.href = href;
@@ -144,16 +108,13 @@ const listed = (e: Entry) => state.shortlist.some((f) => keyOf(f) === keyOf(e));
 function toggleListed(e: Entry) {
   const k = keyOf(e);
   state.shortlist = listed(e) ? state.shortlist.filter((f) => keyOf(f) !== k) : [...state.shortlist, e];
-  try { localStorage.setItem(SHORTLIST_KEY, JSON.stringify(state.shortlist.map(keyOf))); } catch { /* not stored */ }
+  writeStored(SHORTLIST_KEY, JSON.stringify(state.shortlist.map(keyOf)));
   toast(listed(e) ? "Added to the shortlist" : "Removed from the shortlist");
   render();
 }
 
 function loadShortlist() {
-  try {
-    const keys: string[] = JSON.parse(localStorage.getItem(SHORTLIST_KEY) ?? "[]");
-    state.shortlist = keys.map(parseKey).filter((k) => k !== null).map((k) => create(k.seed, k.locks, k));
-  } catch { /* no storage */ }
+  state.shortlist = readShortlist().map((key) => create(key.seed, key.locks, key));
 }
 
 // ---------- the feed ----------
@@ -197,7 +158,7 @@ function nextEntry(): Entry {
   const w = walkNeighbors();
   if (w?.next != null) return state.shortlist[w.next];
   if (!w && state.index < state.history.length - 1) return upToDate(state.index + 1);
-  if (!state.next) state.next = create(randomSeed(), current()?.locks ?? {});
+  if (!state.next) state.next = create(randomSeed(), current()?.locks ?? {}, state);
   return state.next;
 }
 
@@ -222,12 +183,7 @@ function goPrev() {
 }
 
 function toggleLock(role: Lockable | CanvasKind) {
-  const e = current();
-  const locks = { ...e.locks };
-  if (locks[role]) delete locks[role];
-  else locks[role] = role === "paper" || role === "ink" ? e.canvas[role] : e.palette[role];
-  // re-create with the same seed so nothing changes visually, only the lock state
-  state.history[state.index] = { ...e, locks };
+  state.history[state.index] = toggleEntryLock(current(), role);
   state.next = null;
   render();
 }
@@ -302,7 +258,7 @@ function showOf(): Show {
 
 function setShow(s: Show) {
   state.show = s;
-  try { localStorage.setItem(SHOW_KEY, s); } catch { /* not stored */ }
+  writeStored(SHOW_KEY, s);
   render();
 }
 
@@ -329,83 +285,6 @@ function gradientTile(e: Entry): string {
   return `<div class="grad-tile" style="background:${gradientCss(m)}">
     <h3 style="color:${gradientInk(e, m.top)}">${esc(e.name.split(" & ")[0])}</h3>
     <div class="names" style="color:${gradientInk(e, m.bottom)}">${names}</div></div>`;
-}
-
-const themeVars = (t: Theme) => Object.entries(t).map(([k, v]) => `--t-${k.replace(/[A-Z]/g, (x) => "-" + x.toLowerCase())}:${v}`).join(";");
-
-/** activity bars: the days before in the series colors (alternating with 4 colors), today in the loud color, the days to come empty */
-function activityBars(e: Entry): string {
-  const rng = createRng(e.seed ^ 0x5bd1);
-  return Array.from({ length: 7 }, (_, i) => `<i class="${i < 4 ? (i % 2 ? "past alt" : "past") : i === 4 ? "on" : ""}" style="height:${30 + rng() * 70}%"></i>`).join("");
-}
-
-const D_ICONS = {
-  home: `<path d="M3 7.5 8 3l5 4.5V13H3z"/>`,
-  folder: `<path d="M2.5 4.5h4l1.5 1.5h5.5v6.5h-11z"/>`,
-  users: `<circle cx="6" cy="6" r="2.2"/><path d="M2.5 13c.5-2.3 1.8-3.4 3.5-3.4s3 1.1 3.5 3.4"/><path d="M10.5 4.2a2 2 0 0 1 0 3.8M11.5 9.8c1 .5 1.7 1.5 2 3.2"/>`,
-  chart: `<path d="M3 13V8M8 13V3M13 13V6"/>`,
-  gear: `<circle cx="8" cy="8" r="2.2"/><path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.8 3.8l1.4 1.4M10.8 10.8l1.4 1.4M3.8 12.2l1.4-1.4M10.8 5.2l1.4-1.4"/>`,
-};
-const dIcon = (k: keyof typeof D_ICONS) => `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${D_ICONS[k]}</svg>`;
-
-/** with two data series (four colors), a legend for the bars */
-const seriesLegend = (t: Theme, cls: string) => t.accent2 === t.accent ? "" :
-  `<div class="${cls}"><span><i style="background:var(--t-accent)"></i>Design</span><span><i style="background:var(--t-accent2)"></i>Research</span></div>`;
-
-// Interface preview: the loud color only in small fills (main action, logo,
-// badge, today's bar, toggle), its own tint as the second series, the next
-// color darkened for tags with white text; cards on a calm background.
-// Sized in container widths, so it reads the same as a tile and as a screen.
-function mobileUi(t: Theme, e: Entry): string {
-  return `<div class="m-ui" style="${themeVars(t)}">
-    <div class="m-top"><div class="m-logo">${esc(e.name[0])}</div><b>${esc(e.name.split(" & ")[0])}</b><div class="m-avatar"></div></div>
-    <div class="m-card"><div class="m-label">Weekly activity</div>
-      <div class="m-row"><span class="m-big">2,481</span><span class="m-badge">+12.4%</span></div>
-      <div class="m-bars">${activityBars(e)}</div>${seriesLegend(t, "m-legend")}</div>
-    <div class="m-pair"><span class="m-chip second">Design<b>12</b></span><span class="m-chip">Research<b>7</b></span></div>
-    <ul class="m-list"><li>Notifications<span class="m-toggle"></span></li></ul>
-    <div class="m-more m-projects"><div class="m-label">Projects</div><ul class="m-list">${(["companion", "anchor", "dark"] as Role[]).map((r, i) => `<li><b>${esc(e.names[r])}</b><span class="m-tag${i % 2 ? "" : " second"}">${["Design", "Research", "Launch"][i]}</span></li>`).join("")}</ul></div>
-    <div class="m-more m-today"><div class="m-label">Today</div><ul class="m-list m-tasks"><li class="done"><i></i>Review the palette</li><li><i></i>Ship the new theme</li></ul></div>
-    <div class="m-btns"><span class="m-btn p">Create</span><span class="m-btn o">Import</span></div>
-    <div class="m-more m-tabs">${(["home", "folder", "users", "gear"] as const).map((k, i) => `<span${i ? "" : ` class="on"`}>${dIcon(k)}</span>`).join("")}</div>
-  </div>`;
-}
-
-// The same interface on a wide screen, in a desktop app's sizes: navigation,
-// key figures, a table of projects (named after the palette's colors) and
-// settings. The colors play the same parts as on the phone.
-function desktopUi(t: Theme, e: Entry): string {
-  const rng = createRng(e.seed ^ 0xd35c);
-  const nav = ([["home", "Overview"], ["folder", "Projects"], ["users", "Team"], ["chart", "Reports"], ["gear", "Settings"]] as const)
-    .map(([icon, label], i) => `<li${i ? "" : ` class="on"`}>${dIcon(icon)}${label}</li>`).join("");
-  const tags = [["Design", "second"], ["Research", ""], ["Launch", "second"], ["Content", ""]];
-  const status = ["In review", "Active", "Active", "Draft"];
-  const projects = (["companion", "anchor", "light", "dark"] as Role[]).map((r, i) => {
-    const done = Math.round(20 + rng() * 75);
-    return `<tr><td><b>${esc(e.names[r])}</b></td><td><span class="w-tag ${tags[i][1]}">${tags[i][0]}</span></td><td class="w-muted">${status[i]}</td><td><span class="w-progress"><i style="width:${done}%"></i></span></td><td class="w-num">${done}%</td></tr>`;
-  }).join("");
-  const toggle = (label: string, on: boolean) => `<li>${label}<span class="w-toggle${on ? "" : " off"}"></span></li>`;
-  return `<div class="w-ui" style="${themeVars(t)}">
-    <div class="w-nav">
-      <div class="w-brand"><div class="w-logo">${esc(e.name[0])}</div><b>${esc(e.name.split(" & ")[0])}</b></div>
-      <ul>${nav}</ul>
-      <div class="w-plan"><div class="w-label">Storage</div><span class="w-progress"><i style="width:72%"></i></span><div class="w-muted">7.2 of 10 GB</div></div>
-    </div>
-    <div class="w-main">
-      <div class="w-head"><b class="w-h">Overview</b><span class="w-search">Search…</span><span class="w-btn p">Create</span><span class="w-avatar"></span></div>
-      <div class="w-stats">
-        <div class="w-card"><div class="w-label">Weekly activity</div><div class="w-row"><span class="w-big">2,481</span><span class="w-badge">+12.4%</span></div><div class="m-bars w-bars">${activityBars(e)}</div>${seriesLegend(t, "w-legend")}</div>
-        <div class="w-card"><div class="w-label">Open tasks</div><div class="w-row"><span class="w-big">38</span><span class="w-muted">6 due today</span></div><span class="w-progress"><i style="width:64%"></i></span><div class="w-muted">64% of the sprint done</div></div>
-        <div class="w-card"><div class="w-label">Team</div><div class="w-row"><span class="w-big">12</span><span class="w-muted">members</span></div><div class="w-pair"><span class="w-tag second">Design 5</span><span class="w-tag">Research 7</span></div></div>
-      </div>
-      <div class="w-split">
-        <div class="w-card w-table"><div class="w-title">Projects<span class="w-link">View all</span></div><table>${projects}</table></div>
-        <div class="w-card"><div class="w-title">Notifications</div>
-          <ul class="w-list">${toggle("Mentions", true)}${toggle("Weekly report", true)}${toggle("Product news", false)}</ul>
-          <div class="w-btns"><span class="w-btn p">Save</span><span class="w-btn o">Cancel</span></div></div>
-      </div>
-    </div>
-  </div>`;
 }
 
 const recolored = (e: Entry) => recolorSvg(state.svg!, svgTargets(e).map((t) => hex(targetColor(e, t))));
@@ -717,7 +596,7 @@ function fitGrid() {
 /** the feed filled with new palettes up to n, made with the current palette's locks */
 function extend(n: number) {
   const base = current();
-  while (state.history.length < n) state.history.push(create(randomSeed(), base.locks));
+  while (state.history.length < n) state.history.push(create(randomSeed(), base.locks, state));
 }
 
 /** the page of the feed the current palette is on, filled up so it is full */
@@ -832,7 +711,7 @@ function setAccessible(on: boolean, store = true) {
   state.accessible = on;
   state.next = null;
   state.shortlist = state.shortlist.map((w) => create(w.seed, w.locks, w));
-  if (store) try { localStorage.setItem(ACCESSIBLE_KEY, on ? "1" : ""); } catch { /* not stored */ }
+  if (store) writeStored(ACCESSIBLE_KEY, on ? "1" : "");
   render();
 }
 
@@ -911,7 +790,11 @@ function mount() {
     b.addEventListener("click", () => pickFamily(b.dataset.family || undefined)));
   document.querySelector<HTMLInputElement>("#neon")!.addEventListener("change", (ev) => setNeon((ev.target as HTMLInputElement).checked));
   document.querySelector<HTMLInputElement>("#accessible")!.addEventListener("change", (ev) => setAccessible((ev.target as HTMLInputElement).checked));
-  swipe();
+  feedGo = attachSwipe(document.querySelector("main")!, {
+    enabled: () => state.view === "feed",
+    hasPrevious: () => prevEntry() !== null,
+    move: (direction) => direction === 1 ? goNext() : goPrev(),
+  });
 }
 
 // ---------- the tour ----------
@@ -921,7 +804,7 @@ const SEEN_KEY = "colors.seen";
 /** the tour in the live app: a line of hints, one thing to try at a time, until all was tried */
 function tour() {
   if (tourActive()) return endTour();
-  try { localStorage.setItem(SEEN_KEY, "1"); } catch { /* not stored */ }
+  writeStored(SEEN_KEY, "1");
   const host: TourHost = {
     wide,
     probe: () => ({ index: state.index, show: state.show, settings: state.settings, svg: !!state.svg, view: state.view, from: state.gridFrom, listed: state.shortlist.length }),
@@ -942,13 +825,12 @@ function toast(msg: string) {
 }
 
 function copy(text: string, label = text) {
-  navigator.clipboard?.writeText(text).catch(() => {});
-  toast(`Copied ${label}`);
+  void copyText(text, label, toast);
 }
 
 const SVG_KEY = "colors.svg";
 const SVG_ROLES_KEY = "colors.svg-roles";
-const saveRoles = () => { try { localStorage.setItem(SVG_ROLES_KEY, JSON.stringify(state.svgRoles)); } catch { /* not stored */ } };
+const saveRoles = () => writeStored(SVG_ROLES_KEY, JSON.stringify(state.svgRoles));
 
 /** a logo-like mark in three colors: the example on the SVG screen, for a look before an SVG of your own */
 const SAMPLE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
@@ -957,37 +839,46 @@ const SAMPLE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120
   <path d="M60 26A34 34 0 0 1 60 94A44 44 0 0 0 60 26Z" fill="#f43f5e"/>
 </svg>`;
 
-function useSample() {
-  state.svg = analyzeSvg(SAMPLE_SVG);
+let svgLoadId = 0;
+
+async function useSample() {
+  const loadId = ++svgLoadId;
+  const art = await analyzeSvg(SAMPLE_SVG);
+  if (loadId !== svgLoadId) return;
+  state.svg = art;
   state.svgSample = true;
   state.svgRoles = {};
 }
 
-function loadSvg(text: string, quiet = false) {
+async function loadSvg(text: string, quiet = false) {
+  const loadId = ++svgLoadId;
   try {
-    state.svg = analyzeSvg(text);
+    const art = await analyzeSvg(text);
+    if (loadId !== svgLoadId) return;
+    state.svg = art;
   } catch {
-    if (!quiet) toast("That is not an SVG");
+    if (!quiet && loadId === svgLoadId) toast("Could not read that SVG");
     return;
   }
   state.svgSample = false;
   state.svgRoles = {};
   saveRoles();
-  try { localStorage.setItem(SVG_KEY, text); } catch { /* not stored, still shown */ }
+  writeStored(SVG_KEY, text);
   if (quiet) return;
   state.show = "svg";
-  toast(`SVG with ${state.svg.colors.length} colors`);
+  toast(`SVG with ${state.svg.colors.length} ${state.svg.colors.length === 1 ? "color" : "colors"}`);
   render();
 }
 
-function svgAction(action: string) {
+async function svgAction(action: string) {
   const e = current();
   if (action === "open") document.querySelector<HTMLDialogElement>(".svg-dialog")!.showModal();
-  else if (action === "sample") { useSample(); state.show = "svg"; render(); }
+  else if (action === "sample") { await useSample(); state.show = "svg"; render(); }
   else if (action === "remove") {
+    svgLoadId++;
     state.svg = null;
     state.svgSample = false;
-    try { localStorage.removeItem(SVG_KEY); } catch { /* nothing stored */ }
+    writeStored(SVG_KEY, null);
     render();
   } else if (action === "copy") copy(recolored(e), "SVG");
   else if (action === "download") {
@@ -997,84 +888,7 @@ function svgAction(action: string) {
   }
 }
 
-/**
- * Swiping through the feed: the track follows the finger, and past a
- * threshold it slides on to the next (or previous) palette. The wheel and
- * the arrow keys do the same with a short animation.
- */
-function swipe() {
-  const main = document.querySelector("main")!;
-  let startY = 0, dy = 0, dragging = false, moving = false, pointerId = -1;
-  const track = () => main.querySelector<HTMLElement>(".feed:not(.still) .track");
-
-  const settle = (dir: 1 | -1 | 0) => {
-    const t = track();
-    if (!t) return;
-    const canGo = dir === 1 || (dir === -1 && prevEntry() !== null);
-    if (!dir || !canGo) {
-      t.style.transition = "transform .3s cubic-bezier(.2,.7,.2,1)";
-      t.style.transform = "";
-      t.addEventListener("transitionend", () => { t.style.transition = ""; }, { once: true });
-      return;
-    }
-    moving = true;
-    t.style.transition = "transform .38s cubic-bezier(.2,.7,.2,1)";
-    t.style.transform = `translateY(${dir === 1 ? -100 : 100}%)`;
-    const done = () => { moving = false; dir === 1 ? goNext() : goPrev(); };
-    t.addEventListener("transitionend", done, { once: true });
-    // if the transition never fires (hidden tab), still move on
-    setTimeout(() => { if (moving) { t.removeEventListener("transitionend", done); done(); } }, 500);
-  };
-  const go = (dir: 1 | -1) => { if (!moving && state.view === "feed" && track()) settle(dir); };
-
-  main.addEventListener("pointerdown", (ev) => {
-    if (moving || ev.button !== 0 || !track()) return;
-    if ((ev.target as HTMLElement).closest("button,select,a,input,textarea")) return;
-    pointerId = ev.pointerId;
-    startY = ev.clientY;
-    dy = 0;
-    dragging = false;
-  });
-  main.addEventListener("pointermove", (ev) => {
-    if (ev.pointerId !== pointerId || moving) return;
-    const t = track();
-    if (!t) return;
-    dy = ev.clientY - startY;
-    if (!dragging && Math.abs(dy) < 8) return;
-    if (!dragging) { dragging = true; main.setPointerCapture(pointerId); }
-    // nothing above the first palette: resist
-    const y = dy > 0 && !prevEntry() ? dy * 0.3 : dy;
-    t.style.transform = `translateY(${y}px)`;
-  });
-  const end = (ev: PointerEvent) => {
-    if (ev.pointerId !== pointerId) return;
-    pointerId = -1;
-    if (!dragging) return;
-    dragging = false;
-    const h = main.clientHeight;
-    settle(Math.abs(dy) > Math.min(80, h * 0.15) ? (dy < 0 ? 1 : -1) : 0);
-  };
-  main.addEventListener("pointerup", end);
-  main.addEventListener("pointercancel", end);
-
-  let wheelAcc = 0, wheelLock = 0;
-  main.addEventListener("wheel", (ev) => {
-    if (!track()) return;
-    ev.preventDefault();
-    const now = Date.now();
-    if (now < wheelLock) return;
-    wheelAcc += ev.deltaY;
-    if (Math.abs(wheelAcc) < 60) return;
-    const dir = wheelAcc > 0 ? 1 : -1;
-    wheelAcc = 0;
-    wheelLock = now + 700;
-    go(dir);
-  }, { passive: false });
-
-  (swipe as { go?: (dir: 1 | -1) => void }).go = go;
-}
-
-const feedGo = (dir: 1 | -1) => (swipe as { go?: (dir: 1 | -1) => void }).go?.(dir);
+let feedGo: (direction: 1 | -1) => void = () => {};
 
 document.addEventListener("click", (ev) => {
   const t = (ev.target as HTMLElement).closest<HTMLElement>("[data-show],[data-star],[data-copy],[data-lock],[data-action],[data-tab],[data-pick],[data-copy-export],[data-copy-link],[data-svg],[data-svg-alt]");
@@ -1156,19 +970,19 @@ window.addEventListener("resize", () => {
 });
 
 // a link: /p/<key>, or an older one with the key in the hash
-const fromUrl = parseLink(keyOfPath(location.pathname) ?? "") ?? readHash();
+const fromUrl = parseLink(keyOfPath(location.pathname) ?? "") ?? parseLegacyKey(location.hash);
 state.families = fromUrl?.families ?? [];
 // without a link: the neon splash on, three colors in the artwork
 state.neon = fromUrl?.neon ?? true;
 state.colors = fromUrl?.colors ?? 3;
-try { state.accessible = fromUrl?.accessible || !!localStorage.getItem(ACCESSIBLE_KEY); } catch { state.accessible = !!fromUrl?.accessible; }
+state.accessible = fromUrl ? fromUrl.accessible : !!readStored(ACCESSIBLE_KEY);
 wasWide = wide();
 mount();
 try {
-  const saved = localStorage.getItem(SVG_KEY);
-  const roles = localStorage.getItem(SVG_ROLES_KEY);
-  if (saved) loadSvg(saved, true);
-  const show = localStorage.getItem(SHOW_KEY);
+  const saved = readStored(SVG_KEY);
+  const roles = readStored(SVG_ROLES_KEY);
+  if (saved) await loadSvg(saved, true);
+  const show = readStored(SHOW_KEY);
   if (SHOWS.some(([s]) => s === show)) state.show = show as Show;
   if (state.svg && roles) { state.svgRoles = JSON.parse(roles); saveRoles(); }
 } catch { /* no storage */ }
@@ -1176,4 +990,4 @@ await loadNames("/colornames.txt");
 loadShortlist();
 push(create(fromUrl?.seed ?? randomSeed(), fromUrl?.locks ?? {}, { ...state, mood: fromUrl?.mood }));
 // the first visit (not via a link to a palette) starts with the tour
-try { if (!fromUrl && !localStorage.getItem(SEEN_KEY)) tour(); } catch { /* no storage */ }
+if (!fromUrl && !readStored(SEEN_KEY)) tour();

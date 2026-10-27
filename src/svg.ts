@@ -21,13 +21,71 @@ function toHex(css: string): string | null {
   return "#" + m.slice(1, 4).map((v) => Number(v).toString(16).padStart(2, "0")).join("");
 }
 
-/** remove what could run code once the SVG is in the page */
+const SVG_NS = "http://www.w3.org/2000/svg";
+// Static vector artwork only. Styles are resolved in isolation, then removed.
+const ELEMENTS = new Set(`svg g defs style title desc path rect circle ellipse polygon polyline line
+  text tspan textPath use symbol marker pattern clipPath mask linearGradient radialGradient stop
+  filter feBlend feColorMatrix feComponentTransfer feComposite feConvolveMatrix feDiffuseLighting
+  feDisplacementMap feDistantLight feDropShadow feFlood feFuncA feFuncB feFuncG feFuncR feGaussianBlur
+  feMerge feMergeNode feMorphology feOffset fePointLight feSpecularLighting feSpotLight feTile feTurbulence`.split(/\s+/));
+const ATTRIBUTES = new Set(`id class style xmlns viewBox preserveAspectRatio x y x1 y1 x2 y2 dx dy
+  width height rx ry r cx cy d points transform pathLength href offset gradientUnits gradientTransform
+  spreadMethod fx fy fr patternUnits patternContentUnits patternTransform markerWidth markerHeight
+  markerUnits refX refY orient clipPathUnits maskUnits maskContentUnits filterUnits primitiveUnits
+  in in2 result mode type values operator k1 k2 k3 k4 stdDeviation edgeMode kernelMatrix kernelUnitLength
+  order targetX targetY divisor bias preserveAlpha scale xChannelSelector yChannelSelector radius
+  baseFrequency numOctaves seed stitchTiles surfaceScale diffuseConstant specularConstant
+  specularExponent limitingConeAngle azimuth elevation z pointsAtX pointsAtY pointsAtZ amplitude
+  exponent intercept slope tableValues startOffset textLength lengthAdjust`.split(/\s+/));
+const PRESENTATION = `fill fill-opacity fill-rule stroke stroke-width stroke-opacity stroke-linecap
+  stroke-linejoin stroke-miterlimit stroke-dasharray stroke-dashoffset clip-rule opacity color
+  stop-color stop-opacity flood-color flood-opacity lighting-color filter clip-path mask marker-start
+  marker-mid marker-end font-family font-size font-style font-weight font-variant letter-spacing
+  word-spacing text-anchor dominant-baseline alignment-baseline paint-order vector-effect
+  visibility display transform transform-origin transform-box`.split(/\s+/);
+
 function sanitize(svg: Element) {
-  svg.querySelectorAll("script, foreignObject").forEach((el) => el.remove());
   for (const el of [svg, ...svg.querySelectorAll("*")]) {
-    for (const a of [...el.attributes]) {
-      if (/^on/i.test(a.name) || (/href$/i.test(a.name) && /^\s*javascript:/i.test(a.value))) el.removeAttribute(a.name);
+    if (el.namespaceURI !== SVG_NS || !ELEMENTS.has(el.localName)) {
+      el.remove();
+      continue;
     }
+    for (const attr of [...el.attributes]) {
+      const name = attr.localName;
+      const allowed = ATTRIBUTES.has(name) || PRESENTATION.includes(name);
+      const externalHref = name === "href" && !attr.value.trim().startsWith("#");
+      const externalPaint = name !== "style" && /url\s*\(/i.test(attr.value)
+        && !/^url\(\s*["']?#[\w:.-]+["']?\s*\)$/.test(attr.value);
+      if (!allowed || externalHref || externalPaint) el.removeAttributeNode(attr);
+    }
+  }
+}
+
+/** Only fragment references survive in the exported vector, including computed CSS paints. */
+function localPaint(value: string): string | null {
+  if (!/url\s*\(/i.test(value)) return value;
+  const match = value.match(/^url\(["']?(?:about:srcdoc|about:blank)?#([\w:.-]+)["']?\)$/);
+  return match ? `url(#${match[1]})` : null;
+}
+
+/** Scripts and external requests are blocked before any imported content is attached. */
+async function measurementFrame(): Promise<HTMLIFrameElement> {
+  const frame = document.createElement("iframe");
+  frame.setAttribute("sandbox", "allow-same-origin");
+  frame.setAttribute("aria-hidden", "true");
+  frame.style.cssText = "position:absolute;left:-10000px;top:0;width:400px;height:400px;border:0;visibility:hidden";
+  const loaded = new Promise<void>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error("SVG measurement timed out")), 5000);
+    frame.onload = () => { clearTimeout(timer); resolve(); };
+  });
+  frame.srcdoc = `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><style>html,body{margin:0}svg{overflow:visible}</style>`;
+  document.body.append(frame);
+  try {
+    await loaded;
+    return frame;
+  } catch (error) {
+    frame.remove();
+    throw error;
   }
 }
 
@@ -39,19 +97,26 @@ function aspectOf(svg: Element): number {
   return w > 0 && h > 0 ? w / h : 1;
 }
 
-export function analyzeSvg(text: string): SvgArt {
-  const doc = new DOMParser().parseFromString(text.trim(), "image/svg+xml");
+export async function analyzeSvg(text: string): Promise<SvgArt> {
+  const parser = new DOMParser();
+  let doc = parser.parseFromString(text.trim(), "image/svg+xml");
+  if (doc.querySelector("parsererror") || doc.documentElement.localName !== "svg") throw new Error("Not an SVG");
+  // Pasted snippets often omit xmlns; normalize them before importing into the HTML document.
+  if (doc.documentElement.namespaceURI === null) {
+    doc.documentElement.setAttribute("xmlns", SVG_NS);
+    doc = parser.parseFromString(new XMLSerializer().serializeToString(doc.documentElement), "image/svg+xml");
+  }
   const svg = doc.documentElement;
-  if (doc.querySelector("parsererror") || svg.localName !== "svg") throw new Error("Not an SVG");
+  if (svg.namespaceURI !== SVG_NS) throw new Error("Not an SVG");
   sanitize(svg);
-  // measure it in the page: computed styles resolve CSS, inheritance and currentColor
-  const host = document.createElement("div");
-  host.style.cssText = "position:absolute;left:-10000px;top:0;width:400px;visibility:hidden";
-  const live = document.importNode(svg, true) as unknown as SVGSVGElement;
+  // A separate document prevents imported CSS from touching the app or inheriting its styles.
+  const frame = await measurementFrame();
+  const measuredDocument = frame.contentDocument!;
+  const view = frame.contentWindow!;
+  const live = measuredDocument.importNode(svg, true) as unknown as SVGSVGElement;
   live.setAttribute("width", "400");
   live.setAttribute("height", "400");
-  host.appendChild(live);
-  document.body.appendChild(host);
+  measuredDocument.body.appendChild(live);
   try {
     const index = new Map<string, number>();
     const colors: { hex: string; area: number }[] = [];
@@ -68,14 +133,14 @@ export function analyzeSvg(text: string): SvgArt {
 
     for (const el of live.querySelectorAll(PAINTED)) {
       if (el.closest(HIDDEN)) continue;
-      const cs = getComputedStyle(el);
+      const cs = view.getComputedStyle(el);
       const r = el.getBoundingClientRect();
       const area = r.width * r.height;
       const paint = (prop: "fill" | "stroke", value: string, weight: number) => {
         const url = value.match(/url\("?#([^")]+)"?\)/);
         if (url) gradientArea.set(url[1], (gradientArea.get(url[1]) ?? 0) + weight);
         const hex = toHex(value);
-        if (hex) add(el, `${prop}:${token(hex, weight)}`);
+        if (hex) add(el, `${prop}:${token(hex, weight)} !important`);
       };
       paint("fill", cs.fill, area);
       if (cs.stroke !== "none") paint("stroke", cs.stroke, 2 * (r.width + r.height) * parseFloat(cs.strokeWidth || "1"));
@@ -94,21 +159,35 @@ export function analyzeSvg(text: string): SvgArt {
       const stops = src ? [...src.querySelectorAll("stop")] : [];
       area /= stops.length || 1;
       for (const s of stops) {
-        const hex = toHex(getComputedStyle(s).stopColor);
-        if (hex) add(s, `stop-color:${token(hex, area)}`);
+        const hex = toHex(view.getComputedStyle(s).stopColor);
+        if (hex) add(s, `stop-color:${token(hex, area)} !important`);
       }
     }
 
-    // write the placeholders into the parsed (not the measured) copy: same element order
-    const own = [...svg.querySelectorAll("*")];
-    const measured = [...live.querySelectorAll("*")];
+    // Bake resolved paint and typography into the clean copy. No imported stylesheet or
+    // arbitrary inline declaration is included in the downloadable SVG.
+    const own = [svg, ...svg.querySelectorAll("*")];
+    const measured = [live, ...live.querySelectorAll("*")];
     measured.forEach((el, i) => {
-      const decls = overrides.get(el);
-      if (!decls) return;
-      const style = own[i].getAttribute("style");
-      own[i].setAttribute("style", [style?.replace(/;\s*$/, ""), ...decls].filter(Boolean).join(";"));
+      const cs = view.getComputedStyle(el);
+      const declarations: string[] = [];
+      for (const property of PRESENTATION) {
+        const value = localPaint(cs.getPropertyValue(property));
+        if (value) declarations.push(`${property}:${value}`);
+      }
+      if (i > 0) {
+        for (const property of ["x", "y", "cx", "cy", "r", "rx", "ry", "width", "height", "d"]) {
+          const value = localPaint(cs.getPropertyValue(property));
+          if (value && value !== "auto" && value !== "none") declarations.push(`${property}:${value}`);
+        }
+      }
+      declarations.push(...(overrides.get(el) ?? []));
+      // Discard the source paints too: escaped CSS URLs must not survive in attributes.
+      for (const property of PRESENTATION) own[i].removeAttribute(property);
+      own[i].setAttribute("style", declarations.join(";"));
     });
-    if (!svg.getAttribute("xmlns")) svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    svg.querySelectorAll("style").forEach((el) => el.remove());
+    if (!svg.getAttribute("xmlns")) svg.setAttribute("xmlns", SVG_NS);
 
     // largest area first; placeholders are renumbered to match
     const order = colors.map((_, i) => i).sort((a, b) => colors[b].area - colors[a].area);
@@ -116,7 +195,7 @@ export function analyzeSvg(text: string): SvgArt {
     const template = new XMLSerializer().serializeToString(svg).replace(/__C(\d+)__/g, (_, i) => `__R${rank.get(Number(i))}__`).replace(/__R/g, "__C");
     return { template, colors: order.map((i) => colors[i]), aspect: aspectOf(svg) };
   } finally {
-    host.remove();
+    frame.remove();
   }
 }
 

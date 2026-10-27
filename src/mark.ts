@@ -1,5 +1,20 @@
 // The mark: a C of four rings, each in a color. The favicon is the mark in the
 // current palette's colors, on its main (fixed colors in public/favicon.svg, for the first load).
+import { contrast } from "./core/color.ts";
+
+/** less contrast to the background than this, and a ring does not read */
+const MIN_CONTRAST = 2;
+
+/**
+ * The rings' colors (inner to outer) on a background: outside the color that
+ * stands out most from it (of `colors` and `more`), inside the other `colors`
+ * in their order; one that does not read takes the outer ring's color.
+ */
+export function ringColors(background: string, colors: string[], more: string[] = []): string[] {
+  const outer = [...colors, ...more].reduce((a, b) => (contrast(b, background) > contrast(a, background) ? b : a));
+  const inner = colors.filter((c) => c !== outer).slice(0, 3).map((c) => (contrast(c, background) < MIN_CONTRAST ? outer : c));
+  return [...inner, outer];
+}
 
 /** the rings, inner to outer */
 const RINGS = [
