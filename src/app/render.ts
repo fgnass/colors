@@ -16,15 +16,12 @@ function writeLink(e: Entry) {
   history.replaceState(null, "", `/p/${linkKey(e)}`);
 }
 
-/** The favicon: the mark in the current palette's colors, on its main. */
+/** The favicon: the mark in the current palette's colors, on the light interface's background. */
 function writeIcon(e: Entry) {
   const p = e.palette;
-  const main = toHex(p.main);
-  const rings = ringColors(main, [p.companion, p.light, p.anchor, p.dark].map(toHex), [
-    toHex(e.canvas.ink),
-    toHex(e.canvas.paper),
-  ]);
-  const href = `data:image/svg+xml,${encodeURIComponent(markSvg(rings, main))}`;
+  const { bg, primary, highlight } = e.themes.light;
+  const rings = ringColors(bg, [primary, ...[p.companion, p.anchor, p.main, p.dark, p.light].map(toHex), highlight]);
+  const href = `data:image/svg+xml,${encodeURIComponent(markSvg(rings, bg))}`;
   const link = document.querySelector<HTMLLinkElement>("link[rel=icon]")!;
   if (link.href !== href) link.href = href;
 }

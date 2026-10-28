@@ -1,23 +1,31 @@
 // The mark: a C of four rings, each in a color. The favicon is the mark in the
-// current palette's colors, on its main (fixed colors in public/favicon.svg, for the first load).
-import { contrast } from "./core/color.ts";
+// current palette's colors, on the light interface's background (fixed colors
+// in public/favicon.svg, for the first load).
+import { contrast, distance, fromHex } from "./core/color.ts";
 
 /** A ring with less contrast to the background than this does not read. */
 const MIN_CONTRAST = 2;
+/** Two inner colors closer than this (OKLab) look the same; the second is not used. */
+const MIN_DISTANCE = 0.08;
 
 /**
  * The rings' colors, inner to outer, on a background. The outer ring takes
- * the color that stands out most from it (of `colors` and `more`), the inner
- * rings the other `colors` in their order. One that does not read takes the
- * outer ring's color.
+ * the color that stands out most from it. The inner rings take the other
+ * `colors` that read on the background and look different from the outer
+ * ring and from each other, in their order. With fewer than three of them,
+ * the rings repeat them, so neighbors are never the same.
  */
-export function ringColors(background: string, colors: string[], more: string[] = []): string[] {
-  const outer = [...colors, ...more].reduce((a, b) => (contrast(b, background) > contrast(a, background) ? b : a));
-  const inner = colors
-    .filter((c) => c !== outer)
-    .slice(0, 3)
-    .map((c) => (contrast(c, background) < MIN_CONTRAST ? outer : c));
-  return [...inner, outer];
+export function ringColors(background: string, colors: string[]): string[] {
+  const outer = colors.reduce((a, b) => (contrast(b, background) > contrast(a, background) ? b : a));
+  const [a, b, c] = colors.reduce<string[]>((picked, color) => {
+    const reads = contrast(color, background) >= MIN_CONTRAST;
+    const differs = [outer, ...picked].every((o) => distance(fromHex(o), fromHex(color)) >= MIN_DISTANCE);
+    return reads && differs ? [...picked, color] : picked;
+  }, []);
+  if (c) return [c, b, a, outer];
+  if (b) return [a, b, a, outer];
+  if (a) return [a, outer, a, outer];
+  return [outer, outer, outer, outer];
 }
 
 /** The rings, inner to outer. */
