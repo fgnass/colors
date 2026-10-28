@@ -1,5 +1,5 @@
-// Moving through the feed by pointer, wheel and keyboard. All three share one
-// transition: the track slides one screen, then the host moves on.
+// Moving through the feed, and the grid's pages, by pointer, wheel and keyboard.
+// All three share one transition: the track slides one screen, then the host moves on.
 interface SwipeHost {
   enabled(): boolean;
   hasPrevious(): boolean;
@@ -14,7 +14,7 @@ const SWIPE_SHARE = 0.15;
 
 export function attachSwipe(main: HTMLElement, host: SwipeHost): (direction: Direction) => void {
   let moving = false;
-  const track = () => main.querySelector<HTMLElement>(".feed:not(.still) .track");
+  const track = () => main.querySelector<HTMLElement>(".feed:not(.still) .track, .pages .track");
 
   /** The track slides back into place. */
   const snapBack = (t: HTMLElement) => {

@@ -243,7 +243,12 @@ body.grid main { overflow: auto; -webkit-overflow-scrolling: touch; }
 .seg button.on kbd { color: #fff; border-color: rgba(255, 255, 255, .4); }
 .seg output { font: 500 11px var(--mono); }
 .seg output:empty { display: none; }
-.wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 24px 20px; justify-content: center; }
+.wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 24px 20px; justify-content: center; align-content: start; }
+/* the feed's pages: the head stays, the pages slide under it. The room between the head and the bar is in PAGE_TOP and PAGE_BOTTOM in grid.ts. */
+.grid-view.paged { height: 100%; min-height: 0; display: flex; flex-direction: column; padding-bottom: 96px; }
+/* 8px more on each side, for the frame and the lift of a tile */
+.pages { position: relative; flex: 1; margin: -8px; overflow: hidden; touch-action: none; }
+.pages .slot { padding: 8px; }
 .wall .item { position: relative; cursor: pointer; transition: transform .3s var(--ease); min-width: 0; }
 .wall .item:hover { transform: translateY(-4px); }
 /* the palette the feed is on */

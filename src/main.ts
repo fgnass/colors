@@ -17,7 +17,7 @@ import { copyText } from "./app/clipboard.ts";
 import { exportLabel, exportText } from "./app/details.ts";
 import { LOCKABLE, type ColorRole, type Entry, type LockRole } from "./app/entry.ts";
 import { goNext, goPrev, prevEntry, remake, toggleLock, walkTo } from "./app/feed.ts";
-import { newSet, openGrid, pageIndices, pick } from "./app/grid.ts";
+import { hasPreviousPage, newSet, openGrid, pageIndices, paged, pick, turnPage } from "./app/grid.ts";
 import { fitUi, isWide, modeInEffect, placeArt } from "./app/layout.ts";
 import { render } from "./app/render.ts";
 import { loadShortlist, remakeShortlist, toggleShortlist } from "./app/shortlist.ts";
@@ -229,11 +229,13 @@ function mount() {
       .addEventListener("change", (ev) => onChange((ev.target as HTMLInputElement).checked));
   checkbox("#neon", setNeon);
   checkbox("#accessible", setAccessible);
+  // The feed moves a palette at a time, the grid a page at a time.
   feedGo = attachSwipe(document.querySelector("main")!, {
-    enabled: () => state.view === "feed",
-    hasPrevious: () => prevEntry() !== null,
+    enabled: () => state.view === "feed" || paged(),
+    hasPrevious: () => (state.view === "grid" ? hasPreviousPage() : prevEntry() !== null),
     move: (direction) => {
-      if (direction === 1) goNext();
+      if (state.view === "grid") turnPage(direction);
+      else if (direction === 1) goNext();
       else goPrev();
       render();
     },
@@ -295,6 +297,7 @@ document.addEventListener("click", (ev) => {
 function onKey(ev: KeyboardEvent) {
   const k = ev.key.toLowerCase();
   const inFeed = state.view === "feed";
+  const swipes = inFeed || paged();
   if (k === "escape") {
     if (state.settings) toggleSettings(false);
     else toggleGrid();
@@ -305,10 +308,10 @@ function onKey(ev: KeyboardEvent) {
       newSet();
       render();
     }
-  } else if ((k === "arrowdown" || k === "arrowright") && inFeed) {
+  } else if ((k === "arrowdown" || k === "arrowright" || k === "pagedown") && swipes) {
     ev.preventDefault();
     feedGo(1);
-  } else if ((k === "arrowup" || k === "arrowleft") && inFeed) {
+  } else if ((k === "arrowup" || k === "arrowleft" || k === "pageup") && swipes) {
     ev.preventDefault();
     feedGo(-1);
   } else if (k === "f" && inFeed) star(current());

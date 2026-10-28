@@ -10,11 +10,19 @@ import { onShortlist } from "./shortlist.ts";
 import { current, entryAt, identityOf, makeEntry, state } from "./state.ts";
 
 const GRID_GAP = 20;
+const ROW_GAP = 24;
 const PHONE_WIDTH = 700;
+/** The narrowest tile that still reads; a phone takes smaller ones for more of them on a page. */
 const TILE_MIN = 150;
+const PHONE_TILE_MIN = 120;
+/** A phone shows two columns at least: one tile alone would cover more, but is no grid. */
+const PHONE_COLS = 2;
 const TILE_ASPECT = 5 / 4;
 /** The tiles should cover this share of the room. */
 const COVER_ENOUGH = 0.75;
+/** The grid's head above the page, the bar below it (see .grid-view in the CSS). */
+const PAGE_TOP = 28 + 40 + 16;
+const PAGE_BOTTOM = 96;
 
 interface GridLayout {
   cols: number;
@@ -23,24 +31,20 @@ interface GridLayout {
 }
 
 /**
- * The grid with the most tiles that still read (TILE_MIN wide) and cover
- * three quarters of the viewport, else the one that covers the most of it.
- * On a phone: two columns of six, scrolling.
+ * The grid with the most tiles that still read and cover three quarters of
+ * the room between the head and the bar, else the one that covers the most of it.
  */
 export function gridLayout(): GridLayout {
-  const pad = window.innerWidth > PHONE_WIDTH ? 40 : 16;
+  const phone = window.innerWidth <= PHONE_WIDTH;
+  const pad = phone ? 16 : 40;
+  const tileMin = phone ? PHONE_TILE_MIN : TILE_MIN;
   const w = Math.min(window.innerWidth, 1600) - pad * 2;
-  if (window.innerWidth <= PHONE_WIDTH) return { cols: 2, rows: 6, size: (w - GRID_GAP) / 2 };
-  const top = 28 + 40 + 16;
-  const bottom = 48 + 48;
-  // The tour's line of hints takes room at the bottom.
-  const tourHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--tour")) || 0;
-  const h = window.innerHeight - tourHeight - top - bottom;
+  const h = (document.querySelector("main")?.clientHeight ?? window.innerHeight) - PAGE_TOP - PAGE_BOTTOM;
   let bestFit = { cols: 2, rows: 1, size: (w - GRID_GAP) / 2, cover: 0 };
   for (let rows = 1; rows <= 8; rows++) {
-    for (let cols = 1; cols <= 16; cols++) {
-      const size = Math.min((w - GRID_GAP * (cols - 1)) / cols, ((h + GRID_GAP) / rows - GRID_GAP) / TILE_ASPECT);
-      if (size < TILE_MIN) break;
+    for (let cols = phone ? PHONE_COLS : 1; cols <= 16; cols++) {
+      const size = Math.min((w - GRID_GAP * (cols - 1)) / cols, ((h + ROW_GAP) / rows - ROW_GAP) / TILE_ASPECT);
+      if (size < tileMin) break;
       const cover = (cols * rows * size * size * TILE_ASPECT) / (w * h);
       const better =
         bestFit.cover < COVER_ENOUGH
@@ -59,11 +63,10 @@ export const pageSize = () => {
 };
 
 export function fitGrid() {
-  const el = document.querySelector<HTMLElement>(".wall");
-  if (!el) return;
   const l = gridLayout();
-  el.style.gridTemplateColumns =
-    window.innerWidth <= PHONE_WIDTH ? "repeat(2, 1fr)" : `repeat(${l.cols}, ${Math.floor(l.size)}px)`;
+  document
+    .querySelectorAll<HTMLElement>(".wall")
+    .forEach((el) => (el.style.gridTemplateColumns = `repeat(${l.cols}, ${Math.floor(l.size)}px)`));
 }
 
 /** The feed filled with new palettes up to n, made with the current palette's locks. */
@@ -72,12 +75,31 @@ function extendFeed(n: number) {
   while (state.history.length < n) state.history.push(makeEntry(randomSeed(), base.locks, state));
 }
 
-/** The page of the feed the current palette is on, filled up so it is full. */
-export function fillPage(): { start: number; entries: Entry[] } {
+/** The page of the feed that starts at start, filled up so it is full. */
+function pageAt(start: number): Entry[] {
   const n = pageSize();
-  const start = Math.floor(state.index / n) * n;
   extendFeed(start + n);
-  return { start, entries: Array.from({ length: n }, (_, i) => entryAt(start + i)) };
+  return Array.from({ length: n }, (_, i) => entryAt(start + i));
+}
+
+/** The page of the feed the current palette is on. */
+export function fillPage(): { start: number; entries: Entry[] } {
+  const start = Math.floor(state.index / pageSize()) * pageSize();
+  return { start, entries: pageAt(start) };
+}
+
+/** The grid shows the feed's pages, one above the other, and not the shortlist. */
+export const paged = () => state.view === "grid" && state.gridFrom === "fresh";
+
+export const hasPreviousPage = () => fillPage().start > 0;
+
+/** The page below or above: the feed goes to its first palette. Below the end of the feed, new palettes. */
+export function turnPage(direction: 1 | -1) {
+  const start = fillPage().start + direction * pageSize();
+  if (start < 0) return;
+  pageAt(start);
+  state.index = start;
+  state.next = null;
 }
 
 /** The indices of the page's palettes that are not on the shortlist. */
@@ -102,9 +124,9 @@ export function newSet() {
   openGrid();
 }
 
-/** The palette of a tile. */
+/** The palette of a tile: its place on the shortlist, or in the feed. */
 export function pick(i: number): Entry {
-  return state.gridFrom === "shortlist" ? state.shortlist[i] : state.history[fillPage().start + i];
+  return state.gridFrom === "shortlist" ? state.shortlist[i] : entryAt(i);
 }
 
 /** The text color of a tile, for the star on it. */
@@ -131,20 +153,36 @@ function tile(e: Entry, i: number, cur: string): string {
         ${star}</div>`;
 }
 
-function wall(): string {
+function wall(entries: Entry[], start = 0): string {
+  const cur = identityOf(current());
+  return `<div class="wall">${entries.map((e, i) => tile(e, start + i, cur)).join("")}</div>`;
+}
+
+/** The page of the feed, with the pages above and below it on one track that slides, as in the feed. */
+function pages(): string {
+  const n = pageSize();
+  const { start, entries } = fillPage();
+  const prev = start > 0 ? `<div class="slot prev">${wall(pageAt(start - n), start - n)}</div>` : "";
+  return `<div class="pages"><div class="track">
+      ${prev}
+      <div class="slot cur">${wall(entries, start)}</div>
+      <div class="slot next">${wall(pageAt(start + n), start + n)}</div>
+    </div></div>`;
+}
+
+function body(): string {
   if (modeInEffect() === "svg" && !state.svg) return `<div class="wall-prompt">${svgPrompt()}</div>`;
-  const entries = state.gridFrom === "shortlist" ? state.shortlist : fillPage().entries;
-  if (!entries.length) {
+  if (state.gridFrom === "fresh") return pages();
+  if (!state.shortlist.length) {
     return `<div class="empty">No palettes on the shortlist yet. Star the ones you like (<kbd>F</kbd> or the star on a tile), and they stay when you generate new ones.</div>`;
   }
-  const cur = identityOf(current());
-  return `<div class="wall">${entries.map((e, i) => tile(e, i, cur)).join("")}</div>`;
+  return wall(state.shortlist);
 }
 
 export function gridView(): string {
   const on = (from: typeof state.gridFrom) => (state.gridFrom === from ? "on" : "");
   const pageNo = fillPage().start / pageSize() + 1;
-  return `<div class="grid-view">
+  return `<div class="grid-view${paged() ? " paged" : ""}">
     <div class="grid-head">
       <div class="seg" role="group" aria-label="Which palettes">
         <button class="${on("fresh")}" data-action="fresh">Fresh</button>
@@ -156,6 +194,6 @@ export function gridView(): string {
       <button class="round" data-action="tour" title="The tour" aria-label="The tour">${ICONS.help}</button>
       <button class="round" data-action="close" title="Back (Esc)" aria-label="Close grid">${ICONS.close}</button>
     </div>
-    ${wall()}
+    ${body()}
   </div>`;
 }
