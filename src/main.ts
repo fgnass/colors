@@ -123,6 +123,15 @@ function copy(text: string, label = text) {
   void copyText(text, label, toast);
 }
 
+/** Shares the palette's link through the system's share sheet, or copies it where there is none. */
+function shareLink() {
+  const url = location.href;
+  if (!navigator.share) return copy(url, "link");
+  navigator.share({ title: document.title, url }).catch((err: unknown) => {
+    if ((err as Error).name !== "AbortError") copy(url, "link");
+  });
+}
+
 /** The tour in the live app: a line of hints, one thing to try at a time, until all was tried. */
 function tour() {
   toggleSettings(false);
@@ -245,7 +254,7 @@ function mount() {
 // ---------- events ----------
 
 const ACTIONABLE =
-  "[data-mode],[data-star],[data-copy],[data-lock],[data-action],[data-tab],[data-pick],[data-copy-export],[data-copy-link],[data-svg],[data-svg-alt]";
+  "[data-mode],[data-star],[data-copy],[data-lock],[data-action],[data-tab],[data-pick],[data-copy-export],[data-share],[data-svg],[data-svg-alt]";
 
 function onAction(action: string) {
   switch (action) {
@@ -290,7 +299,7 @@ document.addEventListener("click", (ev) => {
     state.view = "feed";
     walkTo(state.gridFrom === "shortlist" ? i : null, pick(i));
     render();
-  } else if ("copyLink" in d) copy(location.href, "link");
+  } else if ("share" in d) shareLink();
   else if ("copyExport" in d) copy(exportText(current()), exportLabel());
 });
 

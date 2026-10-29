@@ -10,6 +10,10 @@ import { ICONS, lockIcon } from "./icons.ts";
 import { starButton, titleHeading } from "./fragments.ts";
 import { state, type Tab } from "./state.ts";
 
+const REPO_URL = "https://github.com/fgnass/colors";
+const PRIVACY_URL = "https://gnass.buzz/privacy";
+const CAN_SHARE = typeof navigator.share === "function";
+
 /** The WCAG 2 rating of text in a color on a canvas. */
 function wcagRating(ratio: number): string {
   if (ratio >= 7) return "AAA";
@@ -98,6 +102,7 @@ export function details(e: Entry): string {
     <div class="tabs">${tabs}
       <button class="copy" data-copy-export title="Copy ${state.tab === "scales" ? "CSS" : state.tab}">Copy</button></div>
     <div class="panel">${panel}</div>
-    <div class="dl"><div class="label">Share</div>
-      <div class="btns"><button class="act ghost" data-copy-link>Copy link</button></div></div>`;
+    <div class="dl">
+      <div class="btns"><button class="act ghost" data-share>${CAN_SHARE ? "Share" : "Copy link"}</button>
+        <span class="about"><a href="${REPO_URL}" target="_blank" rel="noopener">Source on GitHub</a><a href="${PRIVACY_URL}" target="_blank" rel="noopener">Privacy</a></span></div></div>`;
 }

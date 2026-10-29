@@ -222,7 +222,10 @@ body.grid main { overflow: auto; -webkit-overflow-scrolling: touch; }
 .scale button.home { box-shadow: inset 0 0 0 2px #fff, inset 0 0 0 3.5px rgba(0, 0, 0, .35); }
 .scales .steps { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 2px; font: 500 9px var(--mono); color: var(--ink-3); }
 .dl { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
-.dl .btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.dl .btns { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.dl .about { margin-left: auto; display: flex; gap: 16px; font-size: 13px; }
+.dl .about a { color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; }
+.dl .about a:hover { color: var(--ink); }
 .label { font: 500 10.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); }
 .act.ghost { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #d9d9de; font-size: 12.5px; color: var(--ink); background: #fff; }
 .act.ghost:hover { background: var(--hover); }
@@ -404,9 +407,6 @@ body.settings-open .settings { transform: none; }
 .field.row { flex-direction: row; align-items: center; gap: 12px; }
 .field.row > div:first-child { flex: 1; }
 .hint { font-size: 12px; color: var(--ink-2); margin-top: 4px; }
-.settings .about { display: flex; gap: 16px; margin-top: -6px; font-size: 12px; }
-.settings .about a { color: var(--ink-2); text-decoration: none; }
-.settings .about a:hover { color: var(--ink); text-decoration: underline; }
 .hues { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .hues button { position: relative; width: 28px; height: 28px; border-radius: 50%; background: var(--dot); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .08); transition: transform .15s var(--ease); }
 .hues button:hover { transform: scale(1.12); }
